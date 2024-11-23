@@ -1,21 +1,26 @@
 #include <GxEPD2_BW.h>
-#include <Adafruit_ADS1X15.h>
+#include<ADS1115_WE.h> 
+#include "Adafruit_SHT31.h"
+#include<Wire.h>
+#define I2C_ADDRESS 0x48
+
 #include "driver/periph_ctrl.h"
 
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
-Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
+
+ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS); /* Use this for the 16-bit version */
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 1
 
-#define sleeptimeSecs 300
+#define sleeptimeSecs 60
 #define maxArray 1500
 #define controlpin 10
 #define controlpin2 0
 RTC_DATA_ATTR float volts0[maxArray];
 
-
-
+  float t, h;
 
  RTC_DATA_ATTR   int firstrun = 100;
 RTC_DATA_ATTR float minVal = 3.9;
@@ -57,7 +62,7 @@ void gotosleep() {
       //periph_module_disable(PERIPH_I2C0_MODULE);  
       //digitalWrite(SDA, 0);
       //digitalWrite(SCL, 0);
-      esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000);
+      esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000ULL);
       delay(1);
       esp_deep_sleep_start();
       //esp_light_sleep_start();
@@ -73,7 +78,7 @@ void doDisplay() {
     for (int i = 0; i < (maxArray - 1); i++) {
         volts0[i] = volts0[i + 1];
     }
-    volts0[(maxArray - 1)] = newVal;
+    volts0[(maxArray - 1)] = t;
 
     // Increase the reading count up to maxArray
     if (readingCount < maxArray) {
@@ -119,13 +124,15 @@ void doDisplay() {
     do {
         display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
         display.setCursor(0, 9);
-        display.print(maxVal, 4);
+        display.print(maxVal, 3);
         display.setCursor(0, 122);
-        display.print(minVal, 4);
-        display.setCursor(200, 122);
+        display.print(minVal, 3);
+        display.setCursor(150, 122);
         display.print(">");
         display.print(newVal, 4);
-        display.print("<");
+        display.print("v, ");
+        display.print(t, 3);
+        display.print("c<");
         display.setCursor(125, 9);
         display.print("#");
         display.print(readingCount);
@@ -144,6 +151,15 @@ void doDisplay() {
     display.setFullWindow();
 }
 
+float readChannel(ADS1115_MUX channel) {
+  float voltage = 0.0;
+  adc.setCompareChannels(channel);
+  adc.startSingleMeasurement();
+  while(adc.isBusy()){}
+  voltage = adc.getResult_V(); // alternative: getResult_mV for Millivolt
+  return voltage;
+}
+
 
 void setup()
 {
@@ -152,11 +168,14 @@ void setup()
   digitalWrite(controlpin, HIGH);
   digitalWrite(controlpin2, HIGH);
   delay(10);
-  ads.setGain(GAIN_ONE);    
-  ads.begin();
+  Wire.begin();  
+  sht31.begin(0x44);
+  adc.init();
+  adc.setVoltageRange_mV(ADS1115_RANGE_4096);
    //newVal = analogReadMilliVolts(0) / 500.0;
-  newVal = ads.computeVolts(ads.readADC_Differential_0_1()) * 2.0;
-
+  newVal = readChannel(ADS1115_COMP_0_GND) * 2.0;
+   t = sht31.readTemperature();
+   h = sht31.readHumidity();
   delay(10);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
         display.setRotation(1);
