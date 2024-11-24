@@ -1,12 +1,14 @@
 #include <GxEPD2_BW.h>
-#include<ADS1115_WE.h> 
-#include "Adafruit_SHT31.h"
+#include <Adafruit_AHTX0.h>
+#include <Adafruit_BMP280.h>
+Adafruit_AHTX0 aht;
+Adafruit_BMP280 bmp;
+sensors_event_t humidity, temp;
 #include<Wire.h>
 #define I2C_ADDRESS 0x48
-
+#include<ADS1115_WE.h> 
 #include "driver/periph_ctrl.h"
 
-Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 
 ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS); /* Use this for the 16-bit version */
@@ -17,7 +19,7 @@ ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS); /* Use this for the 16-bit version */
 #define sleeptimeSecs 60
 #define maxArray 1500
 #define controlpin 10
-#define controlpin2 0
+
 RTC_DATA_ATTR float volts0[maxArray];
 
   float t, h;
@@ -35,7 +37,7 @@ RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 #include <Fonts/DejaVu_Serif_Condensed_36.h>
 #include <Fonts/DejaVu_Serif_Condensed_60.h>
 
-GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 1, /*RES=*/ 2, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
+GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 
 
 
@@ -55,7 +57,7 @@ void gotosleep() {
       pinMode(2, INPUT_PULLUP );
       pinMode(3, INPUT_PULLUP );
       pinMode(controlpin, INPUT);
-      pinMode(controlpin2, INPUT);
+
       //delay(10000);
       //rtc_gpio_isolate(gpio_num_t(SDA));
       //rtc_gpio_isolate(gpio_num_t(SCL));
@@ -164,18 +166,26 @@ float readChannel(ADS1115_MUX channel) {
 void setup()
 {
   pinMode(controlpin, OUTPUT);
-  pinMode(controlpin2, OUTPUT);
   digitalWrite(controlpin, HIGH);
-  digitalWrite(controlpin2, HIGH);
+
   delay(10);
   Wire.begin();  
-  sht31.begin(0x44);
+
+  aht.begin();
+  bmp.begin();
+  bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500);
+  bmp.takeForcedMeasurement();
   adc.init();
   adc.setVoltageRange_mV(ADS1115_RANGE_4096);
    //newVal = analogReadMilliVolts(0) / 500.0;
   newVal = readChannel(ADS1115_COMP_0_GND) * 2.0;
-   t = sht31.readTemperature();
-   h = sht31.readHumidity();
+  aht.getEvent(&humidity, &temp);
+   t = temp.temperature;
+   h = humidity.relative_humidity;
   delay(10);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
         display.setRotation(1);
