@@ -16,7 +16,7 @@ int GPIO_reason;
 #define ENABLE_GxEPD2_GFX 1
 
 #define sleeptimeSecs 300
-#define maxArray 375
+#define maxArray 401
 #define controlpin 10
 
 RTC_DATA_ATTR float array1[maxArray];
@@ -99,23 +99,28 @@ void wipeScreen(){
 
     //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
     barx = mapf (vBat, 3.4, 4.15, 0, 19);
+    if (barx > 19) {barx = 19;}
 }
 
 void setupChart(){
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        display.setCursor(0, 9);
+        
+        display.setCursor(0, 0);
+        display.print("-");
         display.print(maxVal, 3);
-        display.setCursor(0, 122);
+        display.setCursor(0, 114);
+        display.print("-");
         display.print(minVal, 3);
-        display.setCursor(120, 122);
+        display.setCursor(110, 114);
         display.print("<#");
-        display.print(readingCount, 0);
-        display.print(">");
+        display.print(readingCount - 1, 0);
+        display.print("*");
+        display.print(sleeptimeSecs, 0);
+        display.print("s>");
         display.drawRect(229,114,19,7,GxEPD_BLACK);
         display.fillRect(229,114,barx,7,GxEPD_BLACK); 
         display.drawLine(248,115,248,119,GxEPD_BLACK);
         display.drawLine(249,115,249,119,GxEPD_BLACK);
-        display.setCursor(125, 9);
+        display.setCursor(125, 0);
 }
 
 double mapf(float x, float in_min, float in_max, float out_min, float out_max)
@@ -145,10 +150,7 @@ void doTempDisplay() {
     
     
     do {
-        setupChart();
-        display.print("Temp: ");
-        display.print(t, 3);
-        display.print("c");
+        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
@@ -159,6 +161,12 @@ void doTempDisplay() {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+        setupChart();
+        display.print("[");
+        display.print("Temp: ");
+        display.print(t, 3);
+        display.print("c");
+        display.print("]");
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -187,10 +195,7 @@ void doHumDisplay() {
     
     
     do {
-        setupChart();
-        display.print("Hum: ");
-        display.print(h, 3);
-        display.print("%");
+        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
@@ -201,6 +206,12 @@ void doHumDisplay() {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+        setupChart();
+        display.print("[");
+        display.print("Hum: ");
+        display.print(h, 3);
+        display.print("%");
+        display.print("]");
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -229,10 +240,7 @@ void doPresDisplay() {
     
     
     do {
-        setupChart();
-        display.print("Pres: ");
-        display.print(pres, 2);
-        display.print("mb");
+        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
@@ -243,6 +251,12 @@ void doPresDisplay() {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+        setupChart();
+        display.print("[");
+        display.print("Pres: ");
+        display.print(pres, 2);
+        display.print("mb");
+        display.print("]");
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -272,23 +286,7 @@ void doBatDisplay() {
     
     do {
         display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        display.setCursor(0, 9);
-        display.print(maxVal, 4);
-        display.setCursor(0, 122);
-        display.print(minVal, 4);
-        display.setCursor(120, 122);
-        display.print("<#");
-        display.print(readingCount, 0);
-        display.print(">");
-        display.setCursor(180, 122);
-        int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
-        display.print("batPct: ");
-        display.print(batPct, 1);
-        display.print("%");
-        display.setCursor(125, 9);
-        display.print("vBat: ");
-        display.print(vBat, 4);
-        display.print("v");
+
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
@@ -299,6 +297,29 @@ void doBatDisplay() {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+        display.setCursor(0, 0);
+        display.print("-");
+        display.print(maxVal, 4);
+        display.setCursor(0, 114);
+        display.print("-");
+        display.print(minVal, 4);
+        display.setCursor(120, 114);
+        display.print("<#");
+        display.print(readingCount - 1, 0);
+        display.print("*");
+        display.print(sleeptimeSecs, 0);
+        display.print("s>");
+        display.setCursor(180, 114);
+        int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
+        display.print("[");
+        display.print("batPct: ");
+        display.print(batPct, 1);
+        display.print("%");
+        display.print("]");
+        display.setCursor(125, 0);
+        display.print("vBat: ");
+        display.print(vBat, 4);
+        display.print("v");
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -307,8 +328,10 @@ void doBatDisplay() {
 
 void setup()
 {
+  vBat = analogReadMilliVolts(0) / 500.0;
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
+
    GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
   delay(10);
   Wire.begin();  
@@ -321,7 +344,7 @@ void setup()
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
                   Adafruit_BMP280::STANDBY_MS_500);
   bmp.takeForcedMeasurement();
-  vBat = analogReadMilliVolts(0) / 500.0;
+  
   aht.getEvent(&humidity, &temp);
    t = temp.temperature;
    h = humidity.relative_humidity;
@@ -329,13 +352,13 @@ void setup()
   delay(10);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(1);
-  display.setFont(&Roboto_Condensed_12);
+  //display.setFont(&Roboto_Condensed_12);
             
   if (firstrun >= 100) {display.clearScreen();
   firstrun = 0;}
   firstrun++;
 
-  display.setTextColor(GxEPD_BLACK);
+  display.setTextColor(GxEPD_BLACK, GxEPD_WHITE);
   
 
   if (readingCount < maxArray) {
