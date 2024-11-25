@@ -1,6 +1,11 @@
 #include <GxEPD2_BW.h>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_BMP280.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+AsyncWebServer server(80);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 sensors_event_t humidity, temp;
@@ -10,7 +15,8 @@ sensors_event_t humidity, temp;
 int GPIO_reason;
 #include "esp_sleep.h"
 
-
+const char* ssid = "mikesnet";
+const char* password = "springchicken";
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 1
@@ -47,6 +53,45 @@ GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ S
 
 float vBat;
 
+void startWebserver(){
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  display.clearScreen();
+  display.setPartialWindow(0, 0, display.width(), display.height());
+  display.setCursor(0, 0);
+  display.firstPage();
+  do {
+    display.print("Connecting...");
+  } while (display.nextPage());
+  
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() > 20000) {WiFi.setTxPower (WIFI_POWER_8_5dBm);}
+    //display.firstPage();
+    //do {
+      display.print(".");
+       display.display(true);
+    //} while (display.nextPage());
+    delay(1000);
+  }
+  wipeScreen();
+  display.setCursor(0, 0);
+  display.firstPage();
+  do {
+    display.print("Connected! to: ");
+    display.println(WiFi.localIP());
+  } while (display.nextPage());
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Hi! I am a little e-paper thing.");
+  });
+  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  display.println("Webserver started at /update");
+    display.print("RSSI: ");
+    display.println(WiFi.RSSI());
+   display.display(true);
+}
+
 void gotosleep() {
       //WiFi.disconnect();
       display.hibernate();
@@ -61,6 +106,7 @@ void gotosleep() {
       pinMode(2, INPUT_PULLUP );
       pinMode(3, INPUT_PULLUP );
       pinMode(0, INPUT_PULLUP );
+      pinMode(5, INPUT_PULLUP );
       pinMode(controlpin, INPUT);
 
       //delay(10000);
@@ -105,10 +151,10 @@ void wipeScreen(){
 void setupChart(){
         
         display.setCursor(0, 0);
-        display.print("-");
+        display.print("<");
         display.print(maxVal, 3);
         display.setCursor(0, 114);
-        display.print("-");
+        display.print("<");
         display.print(minVal, 3);
         display.setCursor(110, 114);
         display.print("<#");
@@ -298,10 +344,10 @@ void doBatDisplay() {
             }
         }
         display.setCursor(0, 0);
-        display.print("-");
+        display.print("<");
         display.print(maxVal, 4);
         display.setCursor(0, 114);
-        display.print("-");
+        display.print("<");
         display.print(minVal, 4);
         display.setCursor(120, 114);
         display.print("<#");
@@ -309,7 +355,7 @@ void doBatDisplay() {
         display.print("*");
         display.print(sleeptimeSecs, 0);
         display.print("s>");
-        display.setCursor(180, 114);
+        display.setCursor(175, 114);
         int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
         display.print("[");
         display.print("batPct: ");
@@ -370,18 +416,42 @@ void takeSamples(){
 void setup()
 {
   vBat = analogReadMilliVolts(0) / 500.0;
+  GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
+  delay(10);
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
-
-   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
-  delay(10);
-
-  delay(10);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(1);
+  pinMode(5, INPUT_PULLUP );
+
+
+
+   
+  delay(10);
+
+
   //display.setFont(&Roboto_Condensed_12);
+
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
+      Wire.begin();  
+
+      aht.begin();
+      bmp.begin();
+      bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
+                      Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                      Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                      Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                      Adafruit_BMP280::STANDBY_MS_500);
+      bmp.takeForcedMeasurement();
+      
+      aht.getEvent(&humidity, &temp);
+      t = temp.temperature;
+      h = humidity.relative_humidity;
+      pres = bmp.readPressure() / 100.0;
+    }
             
   if (firstrun >= 100) {display.clearScreen();
+  
   firstrun = 0;}
   firstrun++;
 
@@ -428,6 +498,13 @@ void setup()
       doBatDisplay();
       break;
     case 5: 
+    delay(50);
+      while (!digitalRead(5))
+        {
+          delay(10);
+          if (millis() > 3000) {startWebserver();
+          return;}
+        }
       takeSamples();
       display.clearScreen();
       switch (page){
@@ -457,8 +534,7 @@ void loop()
 {
     //vBat = analogRead(0);
 
-    doTempDisplay();
-    gotosleep();
+delay(250);
     // Add a delay to sample data at intervals (e.g., every minute)
     //delay(1000); // 1 minute delay, adjust as needed
 }
