@@ -8,8 +8,8 @@ sensors_event_t humidity, temp;
 #define I2C_ADDRESS 0x48
 #include<ADS1115_WE.h> 
 #include "driver/periph_ctrl.h"
-
-
+int GPIO_reason;
+#include "esp_sleep.h"
 
 ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS); /* Use this for the 16-bit version */
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
@@ -36,7 +36,7 @@ RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 #include <Fonts/Open_Sans_Condensed_Bold_54.h> 
 #include <Fonts/DejaVu_Serif_Condensed_36.h>
 #include <Fonts/DejaVu_Serif_Condensed_60.h>
-
+#define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 
 
@@ -56,6 +56,7 @@ void gotosleep() {
       pinMode(1, INPUT_PULLUP );
       pinMode(2, INPUT_PULLUP );
       pinMode(3, INPUT_PULLUP );
+      pinMode(0, INPUT_PULLUP );
       pinMode(controlpin, INPUT);
 
       //delay(10000);
@@ -64,6 +65,12 @@ void gotosleep() {
       //periph_module_disable(PERIPH_I2C0_MODULE);  
       //digitalWrite(SDA, 0);
       //digitalWrite(SCL, 0);
+      uint64_t bitmask = BUTTON_PIN_BITMASK(GPIO_NUM_0) | BUTTON_PIN_BITMASK(GPIO_NUM_1) | BUTTON_PIN_BITMASK(GPIO_NUM_2) | BUTTON_PIN_BITMASK(GPIO_NUM_3) | BUTTON_PIN_BITMASK(GPIO_NUM_5);
+   //   esp_deep_sleep_enable_gpio_wakeup(1 << 0, ESP_GPIO_WAKEUP_GPIO_LOW);
+    //  esp_deep_sleep_enable_gpio_wakeup(1 << 1, ESP_GPIO_WAKEUP_GPIO_LOW);
+   //   esp_deep_sleep_enable_gpio_wakeup(1 << 2, ESP_GPIO_WAKEUP_GPIO_LOW);
+   //   esp_deep_sleep_enable_gpio_wakeup(1 << 3, ESP_GPIO_WAKEUP_GPIO_LOW);
+      esp_deep_sleep_enable_gpio_wakeup(bitmask, ESP_GPIO_WAKEUP_GPIO_LOW);
       esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000ULL);
       delay(1);
       esp_deep_sleep_start();
@@ -136,8 +143,8 @@ void doDisplay() {
         display.print(t, 3);
         display.print("c<");
         display.setCursor(125, 9);
-        display.print("#");
-        display.print(readingCount);
+        display.print("GPIO#");
+        display.print(GPIO_reason);
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
@@ -167,7 +174,7 @@ void setup()
 {
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
-
+   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
   delay(10);
   Wire.begin();  
 
