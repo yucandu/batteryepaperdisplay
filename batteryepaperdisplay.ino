@@ -24,13 +24,14 @@ RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
 
-  float t, h, pres;
+  float t, h, pres, barx;
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 0;
 RTC_DATA_ATTR float minVal = 3.9;
 RTC_DATA_ATTR float maxVal = 4.2;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
+int readingTime;
 
 #include "bitmaps/Bitmaps128x250.h"
 #include <Fonts/FreeMonoBold9pt7b.h>
@@ -95,6 +96,26 @@ void wipeScreen(){
       display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
     } while (display.nextPage());
     display.firstPage();
+
+    //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
+    barx = mapf (vBat, 3.4, 4.15, 0, 19);
+}
+
+void setupChart(){
+        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
+        display.setCursor(0, 9);
+        display.print(maxVal, 3);
+        display.setCursor(0, 122);
+        display.print(minVal, 3);
+        display.setCursor(120, 122);
+        display.print("<#");
+        display.print(readingCount, 0);
+        display.print(">");
+        display.drawRect(229,114,19,7,GxEPD_BLACK);
+        display.fillRect(229,114,barx,7,GxEPD_BLACK); 
+        display.drawLine(248,115,248,119,GxEPD_BLACK);
+        display.drawLine(249,115,249,119,GxEPD_BLACK);
+        display.setCursor(125, 9);
 }
 
 double mapf(float x, float in_min, float in_max, float out_min, float out_max)
@@ -124,15 +145,7 @@ void doTempDisplay() {
     
     
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        display.setCursor(0, 9);
-        display.print(maxVal, 3);
-        display.setCursor(0, 122);
-        display.print(minVal, 3);
-        display.setCursor(150, 122);
-        display.print("vBat: ");
-        display.print(vBat, 4);
-        display.setCursor(125, 9);
+        setupChart();
         display.print("Temp: ");
         display.print(t, 3);
         display.print("c");
@@ -174,15 +187,7 @@ void doHumDisplay() {
     
     
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        display.setCursor(0, 9);
-        display.print(maxVal, 3);
-        display.setCursor(0, 122);
-        display.print(minVal, 3);
-        display.setCursor(150, 122);
-        display.print("vBat: ");
-        display.print(vBat, 4);
-        display.setCursor(125, 9);
+        setupChart();
         display.print("Hum: ");
         display.print(h, 3);
         display.print("%");
@@ -224,15 +229,7 @@ void doPresDisplay() {
     
     
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        display.setCursor(0, 9);
-        display.print(maxVal, 2);
-        display.setCursor(0, 122);
-        display.print(minVal, 2);
-        display.setCursor(150, 122);
-        display.print("vBat: ");
-        display.print(vBat, 4);
-        display.setCursor(125, 9);
+        setupChart();
         display.print("Pres: ");
         display.print(pres, 2);
         display.print("mb");
@@ -279,8 +276,12 @@ void doBatDisplay() {
         display.print(maxVal, 4);
         display.setCursor(0, 122);
         display.print(minVal, 4);
-        display.setCursor(150, 122);
-        int batPct = mapf(vBat, 3.6, 4.15, 0, 100);
+        display.setCursor(120, 122);
+        display.print("<#");
+        display.print(readingCount, 0);
+        display.print(">");
+        display.setCursor(180, 122);
+        int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
         display.print("vPct: ");
         display.print(batPct, 1);
         display.print("%");
