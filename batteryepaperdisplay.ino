@@ -326,14 +326,7 @@ void doBatDisplay() {
     gotosleep();
 }
 
-void setup()
-{
-  vBat = analogReadMilliVolts(0) / 500.0;
-  pinMode(controlpin, OUTPUT);
-  digitalWrite(controlpin, HIGH);
-
-   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
-  delay(10);
+void takeSamples(){
   Wire.begin();  
 
   aht.begin();
@@ -349,6 +342,40 @@ void setup()
    t = temp.temperature;
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
+        if (readingCount < maxArray) {
+            readingCount++;
+        }
+
+        for (int i = 0; i < (maxArray - 1); i++) {
+            array1[i] = array1[i + 1];
+        }
+        array1[(maxArray - 1)] = t;
+
+        for (int i = 0; i < (maxArray - 1); i++) {
+            array2[i] = array2[i + 1];
+        }
+        array2[(maxArray - 1)] = h;
+
+        for (int i = 0; i < (maxArray - 1); i++) {
+            array3[i] = array3[i + 1];
+        }
+        array3[(maxArray - 1)] = pres;
+
+        for (int i = 0; i < (maxArray - 1); i++) {
+            array4[i] = array4[i + 1];
+        }
+        array4[(maxArray - 1)] = vBat;
+}
+
+void setup()
+{
+  vBat = analogReadMilliVolts(0) / 500.0;
+  pinMode(controlpin, OUTPUT);
+  digitalWrite(controlpin, HIGH);
+
+   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
+  delay(10);
+
   delay(10);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(1);
@@ -361,31 +388,10 @@ void setup()
   display.setTextColor(GxEPD_BLACK, GxEPD_WHITE);
   
 
-  if (readingCount < maxArray) {
-      readingCount++;
-  }
 
-  for (int i = 0; i < (maxArray - 1); i++) {
-      array1[i] = array1[i + 1];
-  }
-  array1[(maxArray - 1)] = t;
-
-  for (int i = 0; i < (maxArray - 1); i++) {
-      array2[i] = array2[i + 1];
-  }
-  array2[(maxArray - 1)] = h;
-
-  for (int i = 0; i < (maxArray - 1); i++) {
-      array3[i] = array3[i + 1];
-  }
-  array3[(maxArray - 1)] = pres;
-
-  for (int i = 0; i < (maxArray - 1); i++) {
-      array4[i] = array4[i + 1];
-  }
-  array4[(maxArray - 1)] = vBat;
 
   if (GPIO_reason < 0) {
+    takeSamples();
       switch (page){
         case 0: 
           doTempDisplay();
@@ -422,6 +428,7 @@ void setup()
       doBatDisplay();
       break;
     case 5: 
+      takeSamples();
       display.clearScreen();
       switch (page){
         case 0: 
