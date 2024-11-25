@@ -15,7 +15,7 @@ int GPIO_reason;
 // enable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 1
 
-#define sleeptimeSecs 60
+#define sleeptimeSecs 300
 #define maxArray 375
 #define controlpin 10
 
@@ -28,8 +28,8 @@ RTC_DATA_ATTR float array4[maxArray];
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 0;
-RTC_DATA_ATTR float minVal = 3.9;
-RTC_DATA_ATTR float maxVal = 4.2;
+ float minVal = 3.9;
+ float maxVal = 4.2;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 
@@ -125,8 +125,8 @@ double mapf(float x, float in_min, float in_max, float out_min, float out_max)
 
 void doTempDisplay() {
     // Recalculate min and max values
-    float minVal = array1[maxArray - readingCount];
-    float maxVal = array1[maxArray - readingCount];
+     minVal = array1[maxArray - readingCount];
+     maxVal = array1[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array1[i] < minVal) && (array1[i] > 0)) {
@@ -167,8 +167,8 @@ void doTempDisplay() {
 
 void doHumDisplay() {
     // Recalculate min and max values
-    float minVal = array2[maxArray - readingCount];
-    float maxVal = array2[maxArray - readingCount];
+     minVal = array2[maxArray - readingCount];
+     maxVal = array2[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array2[i] < minVal) && (array2[i] > 0)) {
@@ -209,8 +209,8 @@ void doHumDisplay() {
 
 void doPresDisplay() {
     // Recalculate min and max values
-    float minVal = array3[maxArray - readingCount];
-    float maxVal = array3[maxArray - readingCount];
+     minVal = array3[maxArray - readingCount];
+     maxVal = array3[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array3[i] < minVal) && (array3[i] > 0)) {
@@ -251,8 +251,8 @@ void doPresDisplay() {
 
 void doBatDisplay() {
     // Recalculate min and max values
-    float minVal = array4[maxArray - readingCount];
-    float maxVal = array4[maxArray - readingCount];
+     minVal = array4[maxArray - readingCount];
+     maxVal = array4[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array4[i] < minVal) && (array4[i] > 0)) {
@@ -282,7 +282,7 @@ void doBatDisplay() {
         display.print(">");
         display.setCursor(180, 122);
         int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
-        display.print("vPct: ");
+        display.print("batPct: ");
         display.print(batPct, 1);
         display.print("%");
         display.setCursor(125, 9);
