@@ -210,7 +210,7 @@ void doTempDisplay() {
         setupChart();
         display.print("[");
         display.print("Temp: ");
-        display.print(t, 3);
+        display.print(array1[(maxArray - 1)], 3);
         display.print("c");
         display.print("]");
     } while (display.nextPage());
@@ -255,7 +255,7 @@ void doHumDisplay() {
         setupChart();
         display.print("[");
         display.print("Hum: ");
-        display.print(h, 3);
+        display.print(array2[(maxArray - 1)], 3);
         display.print("%");
         display.print("]");
     } while (display.nextPage());
@@ -300,7 +300,7 @@ void doPresDisplay() {
         setupChart();
         display.print("[");
         display.print("Pres: ");
-        display.print(pres, 2);
+        display.print(array3[(maxArray - 1)], 2);
         display.print("mb");
         display.print("]");
     } while (display.nextPage());
@@ -356,16 +356,13 @@ void doBatDisplay() {
         display.print(sleeptimeSecs, 0);
         display.print("s>");
         display.setCursor(175, 114);
-        int batPct = mapf(vBat, 3.4, 4.15, 0, 100);
-        display.print("[");
-        display.print("batPct: ");
-        display.print(batPct, 1);
-        display.print("%");
-        display.print("]");
+        int batPct = mapf(vBat, 3.3, 4.15, 0, 100);
         display.setCursor(125, 0);
-        display.print("vBat: ");
+        display.print("[vBat: ");
         display.print(vBat, 4);
-        display.print("v");
+        display.print("v/");
+        display.print(batPct, 1);
+        display.print("%]");
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -421,7 +418,7 @@ void setup()
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
-  display.setRotation(1);
+  display.setRotation(3);
   pinMode(5, INPUT_PULLUP );
 
 
@@ -502,7 +499,7 @@ void setup()
       while (!digitalRead(5))
         {
           delay(10);
-          if (millis() > 3000) {startWebserver();
+          if (millis() > 2000) {startWebserver();
           return;}
         }
       takeSamples();
