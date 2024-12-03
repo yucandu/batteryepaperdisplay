@@ -229,11 +229,13 @@ void doTempDisplay() {
      maxVal = array1[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
-        if ((array1[i] < minVal) && (array1[i] > 0)) {
-            minVal = array1[i];
-        }
-        if (array1[i] > maxVal) {
-            maxVal = array1[i];
+        if (array1[i] != 0) {  // Only consider non-zero values
+            if (array1[i] < minVal) {
+                minVal = array1[i];
+            }
+            if (array1[i] > maxVal) {
+                maxVal = array1[i];
+            }
         }
     }
 
@@ -243,16 +245,17 @@ void doTempDisplay() {
 
     wipeScreen();
     
-    
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
+        display.fillRect(0, 0, display.width(), display.height(), GxEPD_WHITE);
         
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
             int y0 = 121 - ((array1[i] - minVal) * yScale);
             int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
             int y1 = 121 - ((array1[i + 1] - minVal) * yScale);
-            if (array1[i] > 0) {
+
+            // Only draw a line for valid (non-zero) values
+            if (array1[i] != 0) {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
