@@ -5,6 +5,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 AsyncWebServer server(80);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
@@ -22,7 +24,7 @@ const char* password = "springchicken";
 #define ENABLE_GxEPD2_GFX 1
 
 #define sleeptimeSecs 300
-#define maxArray 401
+#define maxArray 501
 #define controlpin 10
 
 RTC_DATA_ATTR float array1[maxArray];
@@ -34,6 +36,7 @@ RTC_DATA_ATTR float array4[maxArray];
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 0;
+
  float minVal = 3.9;
  float maxVal = 4.2;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
@@ -49,48 +52,16 @@ int readingTime;
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 
+const char* blynkserver = "192.168.50.197:9443";
+const char* authToken = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
 
+// Virtual Pins
+const char* v41_pin = "V41";
+const char* v62_pin = "V62";
 
 float vBat;
 
-void startWebserver(){
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  display.clearScreen();
-  display.setPartialWindow(0, 0, display.width(), display.height());
-  display.setCursor(0, 0);
-  display.firstPage();
-  do {
-    display.print("Connecting...");
-  } while (display.nextPage());
-  
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 20000) {WiFi.setTxPower (WIFI_POWER_8_5dBm);}
-    //display.firstPage();
-    //do {
-      display.print(".");
-       display.display(true);
-    //} while (display.nextPage());
-    delay(1000);
-  }
-  wipeScreen();
-  display.setCursor(0, 0);
-  display.firstPage();
-  do {
-    display.print("Connected! to: ");
-    display.println(WiFi.localIP());
-  } while (display.nextPage());
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Hi! I am a little e-paper thing.");
-  });
-  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
-  server.begin();
-  display.println("Webserver started at /update");
-    display.print("RSSI: ");
-    display.println(WiFi.RSSI());
-   display.display(true);
-}
+
 
 void gotosleep() {
       //WiFi.disconnect();
@@ -128,6 +99,84 @@ void gotosleep() {
       delay(1000);
 }
 
+void startWifi(){
+
+  //display.clearScreen();
+  display.setPartialWindow(0, 0, display.width(), display.height());
+  display.setCursor(0, 0);
+  display.firstPage();
+
+  do {
+    display.print("Connecting...");
+  } while (display.nextPage());
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);  
+  WiFi.setTxPower (WIFI_POWER_8_5dBm);
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() > 20000) { display.print("!");}
+    if ((millis() > 30000) ||  !digitalRead(5)) {gotosleep();}
+    //do {
+      display.print(".");
+       display.display(true);
+    //} while (display.nextPage());
+    delay(1000);
+  }
+  wipeScreen();
+  display.setCursor(0, 0);
+  display.firstPage();
+  do {
+    display.print("Connected! to: ");
+    display.println(WiFi.localIP());
+  } while (display.nextPage());
+    display.print("RSSI: ");
+    display.println(WiFi.RSSI());
+   display.display(true);
+}
+
+void startWebserver(){
+
+  //display.clearScreen();
+  display.setPartialWindow(0, 0, display.width(), display.height());
+  display.setCursor(0, 0);
+  display.firstPage();
+
+  do {
+    display.print("Connecting...");
+  } while (display.nextPage());
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);  
+  WiFi.setTxPower (WIFI_POWER_8_5dBm);
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() > 20000) { display.print("!");}
+    if ((millis() > 30000) ||  !digitalRead(5)) {gotosleep();}
+    //do {
+      display.print(".");
+       display.display(true);
+    //} while (display.nextPage());
+    delay(1000);
+  }
+  wipeScreen();
+  display.setCursor(0, 0);
+  display.firstPage();
+  do {
+    display.print("Connected! to: ");
+    display.println(WiFi.localIP());
+  } while (display.nextPage());
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Hi! I am a little e-paper thing.");
+  });
+  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  display.println("Webserver started at /update");
+    display.print("RSSI: ");
+    display.println(WiFi.RSSI());
+   display.display(true);
+}
+
+
+
 void wipeScreen(){
 
     display.setPartialWindow(0, 0, display.width(), display.height());
@@ -144,7 +193,7 @@ void wipeScreen(){
     display.firstPage();
 
     //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
-    barx = mapf (vBat, 3.4, 4.15, 0, 19);
+    barx = mapf (vBat, 3.3, 4.05, 0, 19);
     if (barx > 19) {barx = 19;}
 }
 
@@ -255,8 +304,8 @@ void doHumDisplay() {
         setupChart();
         display.print("[");
         display.print("Hum: ");
-        display.print(array2[(maxArray - 1)], 3);
-        display.print("%");
+        display.print(array2[(maxArray - 1)], 2);
+        display.print("g");
         display.print("]");
     } while (display.nextPage());
 
@@ -345,10 +394,10 @@ void doBatDisplay() {
         }
         display.setCursor(0, 0);
         display.print("<");
-        display.print(maxVal, 4);
+        display.print(maxVal, 3);
         display.setCursor(0, 114);
         display.print("<");
-        display.print(minVal, 4);
+        display.print(minVal, 3);
         display.setCursor(120, 114);
         display.print("<#");
         display.print(readingCount - 1, 0);
@@ -356,10 +405,10 @@ void doBatDisplay() {
         display.print(sleeptimeSecs, 0);
         display.print("s>");
         display.setCursor(175, 114);
-        int batPct = mapf(vBat, 3.3, 4.15, 0, 100);
+        int batPct = mapf(vBat, 3.3, 4.05, 0, 100);
         display.setCursor(125, 0);
         display.print("[vBat: ");
-        display.print(vBat, 4);
+        display.print(vBat, 3);
         display.print("v/");
         display.print(batPct, 1);
         display.print("%]");
@@ -367,6 +416,35 @@ void doBatDisplay() {
 
     display.setFullWindow();
     gotosleep();
+}
+
+float fetchBlynkValue(const char* vpin) {
+  WiFiClientSecure client;
+  //client.setCACert(root_ca); // Set the certificate
+  client.setInsecure(); 
+  HTTPClient https;
+  String url = String("https://") + blynkserver + "/" + authToken + "/get/" + vpin;
+
+
+  if (https.begin(client, url)) { // HTTPS connection
+    int httpCode = https.GET();
+    float value = NAN;
+
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = https.getString();
+      payload.replace("[", ""); // Remove brackets from the JSON
+      payload.replace("]", "");
+      payload.replace("\"", ""); // Remove brackets from the JSON
+      payload.replace("\"", "");
+      value = payload.toFloat();
+
+    } 
+    https.end();
+    return value;
+  } else {
+    gotosleep();
+    return NAN;
+  }
 }
 
 void takeSamples(){
@@ -385,6 +463,13 @@ void takeSamples(){
    t = temp.temperature;
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
+   float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
+        float v41_value = fetchBlynkValue(v41_pin);
+        float v62_value = fetchBlynkValue(v62_pin);
+        float min_value = min(v41_value, v62_value);
+            display.println(v41_value);
+    display.println(v62_value);
+   display.display(true);
         if (readingCount < maxArray) {
             readingCount++;
         }
@@ -392,12 +477,12 @@ void takeSamples(){
         for (int i = 0; i < (maxArray - 1); i++) {
             array1[i] = array1[i + 1];
         }
-        array1[(maxArray - 1)] = t;
+        array1[(maxArray - 1)] = min_value;
 
         for (int i = 0; i < (maxArray - 1); i++) {
             array2[i] = array2[i + 1];
         }
-        array2[(maxArray - 1)] = h;
+        array2[(maxArray - 1)] = abshum;
 
         for (int i = 0; i < (maxArray - 1); i++) {
             array3[i] = array3[i + 1];
@@ -414,7 +499,8 @@ void setup()
 {
   vBat = analogReadMilliVolts(0) / 500.0;
   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
-  delay(10);
+  
+  delay(50);
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
@@ -429,23 +515,29 @@ void setup()
 
   //display.setFont(&Roboto_Condensed_12);
 
-  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
+  /*if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
       Wire.begin();  
 
       aht.begin();
-      bmp.begin();
-      bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
-                      Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                      Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                      Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                      Adafruit_BMP280::STANDBY_MS_500);
-      bmp.takeForcedMeasurement();
-      
+
       aht.getEvent(&humidity, &temp);
       t = temp.temperature;
       h = humidity.relative_humidity;
       pres = bmp.readPressure() / 100.0;
-    }
+      display.setTextColor(GxEPD_BLACK, GxEPD_WHITE);
+  display.clearScreen();
+  display.setPartialWindow(0, 0, display.width(), display.height());
+  display.setCursor(0, 10);
+      display.print("Current temp:" );
+      display.print(t);
+      display.println("c");
+      display.setTextColor(GxEPD_WHITE, GxEPD_BLACK);
+      display.print("Sleeping ");
+      display.print(sleeptimeSecs);
+      display.print("s for initial cooldown...");
+       display.display(true);
+      gotosleep();
+    }*/
             
   if (firstrun >= 100) {display.clearScreen();
   
@@ -458,6 +550,7 @@ void setup()
 
 
   if (GPIO_reason < 0) {
+    startWifi();
     takeSamples();
       switch (page){
         case 0: 
@@ -499,7 +592,8 @@ void setup()
       while (!digitalRead(5))
         {
           delay(10);
-          if (millis() > 2000) {startWebserver();
+          if (millis() > 2000) {
+            startWebserver();
           return;}
         }
       takeSamples();
@@ -530,7 +624,7 @@ void setup()
 void loop()
 {
     //vBat = analogRead(0);
-
+if (!digitalRead(5)) {gotosleep();}
 delay(250);
     // Add a delay to sample data at intervals (e.g., every minute)
     //delay(1000); // 1 minute delay, adjust as needed
