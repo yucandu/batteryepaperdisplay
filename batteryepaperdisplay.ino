@@ -150,7 +150,7 @@ void startWebserver(){
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() > 20000) { display.print("!");}
-    if ((millis() > 30000) ||  !digitalRead(5)) {gotosleep();}
+    if ((millis() > 30000)) {gotosleep();}
     //do {
       display.print(".");
        display.display(true);
@@ -316,6 +316,38 @@ void doHumDisplay() {
     gotosleep();
 }
 
+void doWindDisplay() {
+
+
+
+    wipeScreen();
+    
+    
+    do {
+        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
+        
+
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.setTextSize(2);
+        display.setCursor(32,10);
+        display.print("Temp:");
+        display.setCursor(158,10);
+        display.print("Wind:");
+        display.setTextSize(3);
+        display.setCursor(5,66);
+        display.print(array1[(maxArray - 1)], 1);
+        display.print("c");
+        display.setCursor(148,66);
+        display.print(array2[(maxArray - 1)], 0);
+        display.print("kph");
+        display.setTextSize(1);
+    } while (display.nextPage());
+
+    display.setFullWindow();
+    gotosleep();
+}
+
 void doPresDisplay() {
     // Recalculate min and max values
      minVal = array3[maxArray - readingCount];
@@ -439,7 +471,8 @@ float fetchBlynkValue(const char* vpin) {
       payload.replace("]", "");
       payload.replace("\"", ""); // Remove brackets from the JSON
       payload.replace("\"", "");
-      value = payload.toFloat();
+      value = payload.toFloat();  
+      if (isnan(value)) {gotosleep();}
 
     } 
     https.end();
@@ -467,12 +500,17 @@ void takeSamples(){
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
    float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
-        float v41_value = fetchBlynkValue(v41_pin);
-        float v62_value = fetchBlynkValue(v62_pin);
+        float v41_value = fetchBlynkValue("V41");
+        float v62_value = fetchBlynkValue("V62");
+        float windspeed = fetchBlynkValue("V56");
         float min_value = min(v41_value, v62_value);
-            display.println(v41_value);
-    display.println(v62_value);
-   display.display(true);
+        display.print("North temp: ");
+        display.println(v41_value);
+        display.print("Neo temp: ");
+        display.println(v62_value);
+        display.print("Wind speed: ");
+        display.println(windspeed);
+        display.display(true);
         if (readingCount < maxArray) {
             readingCount++;
         }
@@ -485,7 +523,7 @@ void takeSamples(){
         for (int i = 0; i < (maxArray - 1); i++) {
             array2[i] = array2[i + 1];
         }
-        array2[(maxArray - 1)] = abshum;
+        array2[(maxArray - 1)] = windspeed;
 
         for (int i = 0; i < (maxArray - 1); i++) {
             array3[i] = array3[i + 1];
@@ -508,6 +546,7 @@ void setup()
   digitalWrite(controlpin, HIGH);
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(3);
+  display.setTextSize(1);
   pinMode(5, INPUT_PULLUP );
 
 
@@ -563,7 +602,7 @@ void setup()
           doTempDisplay();
           break;
         case 2: 
-          doHumDisplay();
+          doWindDisplay();
           break;
         case 3: 
           doPresDisplay();
@@ -580,7 +619,7 @@ void setup()
       break;
     case 2: 
       page = 2;
-      doHumDisplay();
+      doWindDisplay();
       break;
     case 3: 
       page = 3;
@@ -609,7 +648,7 @@ void setup()
           doTempDisplay();
           break;
         case 2: 
-          doHumDisplay();
+          doWindDisplay();
           break;
         case 3: 
           doPresDisplay();
