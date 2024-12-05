@@ -31,14 +31,14 @@ RTC_DATA_ATTR float array1[maxArray];
 RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
-RTC_DATA_ATTR float windspeed, windgust, fridgetemp;
+RTC_DATA_ATTR float windspeed, windgust, fridgetemp, outtemp;
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
   float t, h, pres, barx;
 
  RTC_DATA_ATTR   int firstrun = 100;
- RTC_DATA_ATTR   int page = 0;
+ RTC_DATA_ATTR   int page = 2;
 
  float minVal = 3.9;
  float maxVal = 4.2;
@@ -108,7 +108,7 @@ void startWifi(){
   //display.clearScreen();
   display.setPartialWindow(0, 0, display.width(), display.height());
   display.setCursor(0, 0);
-  display.firstPage();
+  display.firstpage();
 
   do {
     display.print("Connecting...");
@@ -392,6 +392,10 @@ void doWindDisplay() {
         display.setTextSize(1);
         display.setCursor(0, 114);
         display.print(timeString);
+        display.drawRect(229,114,19,7,GxEPD_BLACK);
+        display.fillRect(229,114,barx,7,GxEPD_BLACK); 
+        display.drawLine(248,115,248,119,GxEPD_BLACK);
+        display.drawLine(249,115,249,119,GxEPD_BLACK);
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -507,7 +511,9 @@ float fetchBlynkValue(const char* vpin, const char* authToken) {
   WiFiClientSecure client;
   //client.setCACert(root_ca); // Set the certificate
   client.setInsecure(); 
+  
   HTTPClient https;
+  https.setReuse(true);
   String url = String("https://") + blynkserver + "/" + authToken + "/get/" + vpin;
 
 
@@ -570,6 +576,8 @@ void takeSamples(){
         fridgetemp = fetchBlynkValue("V1", fridgeauth);
         display.print("Fridge temp: ");
         display.println(fridgetemp);
+        display.print("Time: ");
+        display.print(millis());
         display.display(true);
         float min_value = min(v41_value, v62_value);
 
