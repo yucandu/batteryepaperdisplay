@@ -31,6 +31,7 @@ RTC_DATA_ATTR float array1[maxArray];
 RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
+RTC_DATA_ATTR float windspeed, windgust, fridgetemp;
 
   float t, h, pres, barx;
 
@@ -53,7 +54,8 @@ int readingTime;
 GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 
 const char* blynkserver = "192.168.50.197:9443";
-const char* authToken = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
+const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
+const char* fridgeauth = "VnFlJdW3V0uZQaqslqPJi6WPA9LaG1Pk";
 
 // Virtual Pins
 const char* v41_pin = "V41";
@@ -64,7 +66,7 @@ float vBat;
 
 
 void gotosleep() {
-      //WiFi.disconnect();
+      WiFi.disconnect();
       display.hibernate();
       SPI.end();
       Wire.end();
@@ -115,7 +117,9 @@ void startWifi(){
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() > 20000) { display.print("!");}
-    if ((millis() > 30000) ||  !digitalRead(5)) {gotosleep();}
+    if (millis() > 30000) {
+        return;
+      }
     //do {
       display.print(".");
        display.display(true);
@@ -193,7 +197,7 @@ void wipeScreen(){
     display.firstPage();
 
     //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
-    barx = mapf (vBat, 3.3, 4.05, 0, 19);
+    barx = mapf (vBat, 3.3, 4.15, 0, 19);
     if (barx > 19) {barx = 19;}
 }
 
@@ -329,18 +333,31 @@ void doWindDisplay() {
 
         display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
         display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
         display.setTextSize(2);
-        display.setCursor(32,10);
+        display.setCursor(32,2);
         display.print("Temp:");
-        display.setCursor(158,10);
+        display.setCursor(158,2);
         display.print("Wind:");
+        display.setCursor(24,64);
+        display.print("Fridge:");
+        display.setCursor(158,64);
+        display.print("Gust:");
         display.setTextSize(3);
-        display.setCursor(5,66);
-        display.print(array1[(maxArray - 1)], 1);
+        display.setCursor(5,32);
+        display.print(array3[(maxArray - 1)], 1);
         display.print("c");
-        display.setCursor(148,66);
-        display.print(array2[(maxArray - 1)], 0);
+        display.setCursor(148,32);
+        display.print(windspeed, 0);
         display.print("kph");
+        display.setCursor(15,92);
+        display.print(fridgetemp, 1);
+        display.print("c");
+        display.setCursor(148,92);
+        display.print(windgust, 0);
+        display.print("kph");
+
         display.setTextSize(1);
     } while (display.nextPage());
 
@@ -440,7 +457,7 @@ void doBatDisplay() {
         display.print(sleeptimeSecs, 0);
         display.print("s>");
         display.setCursor(175, 114);
-        int batPct = mapf(vBat, 3.3, 4.05, 0, 100);
+        int batPct = mapf(vBat, 3.3, 4.15, 0, 100);
         display.setCursor(125, 0);
         display.print("[vBat: ");
         display.print(vBat, 3);
@@ -453,7 +470,7 @@ void doBatDisplay() {
     gotosleep();
 }
 
-float fetchBlynkValue(const char* vpin) {
+float fetchBlynkValue(const char* vpin, const char* authToken) {
   WiFiClientSecure client;
   //client.setCACert(root_ca); // Set the certificate
   client.setInsecure(); 
@@ -472,7 +489,7 @@ float fetchBlynkValue(const char* vpin) {
       payload.replace("\"", ""); // Remove brackets from the JSON
       payload.replace("\"", "");
       value = payload.toFloat();  
-      if (isnan(value)) {gotosleep();}
+      if (isnan(value)) {return NAN;}
 
     } 
     https.end();
@@ -500,9 +517,12 @@ void takeSamples(){
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
    float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
-        float v41_value = fetchBlynkValue("V41");
-        float v62_value = fetchBlynkValue("V62");
-        float windspeed = fetchBlynkValue("V56");
+     if (WiFi.status() == WL_CONNECTED) {
+        float v41_value = fetchBlynkValue("V41", bedroomauth);
+        float v62_value = fetchBlynkValue("V62", bedroomauth);
+        windspeed = fetchBlynkValue("V78", bedroomauth);
+        windgust = fetchBlynkValue("V79", bedroomauth);
+        fridgetemp = fetchBlynkValue("V1", fridgeauth);
         float min_value = min(v41_value, v62_value);
         display.print("North temp: ");
         display.println(v41_value);
@@ -510,7 +530,17 @@ void takeSamples(){
         display.println(v62_value);
         display.print("Wind speed: ");
         display.println(windspeed);
+        display.print("Wind gust: ");
+        display.println(windgust);
+        display.print("Fridge temp: ");
+        display.println(fridgetemp);
         display.display(true);
+        for (int i = 0; i < (maxArray - 1); i++) {
+            array3[i] = array3[i + 1];
+        }
+        array3[(maxArray - 1)] = min_value;
+     }
+
         if (readingCount < maxArray) {
             readingCount++;
         }
@@ -518,17 +548,14 @@ void takeSamples(){
         for (int i = 0; i < (maxArray - 1); i++) {
             array1[i] = array1[i + 1];
         }
-        array1[(maxArray - 1)] = min_value;
+        array1[(maxArray - 1)] = t;
 
         for (int i = 0; i < (maxArray - 1); i++) {
             array2[i] = array2[i + 1];
         }
-        array2[(maxArray - 1)] = windspeed;
+        array2[(maxArray - 1)] = abshum;
 
-        for (int i = 0; i < (maxArray - 1); i++) {
-            array3[i] = array3[i + 1];
-        }
-        array3[(maxArray - 1)] = pres;
+
 
         for (int i = 0; i < (maxArray - 1); i++) {
             array4[i] = array4[i + 1];
@@ -605,7 +632,7 @@ void setup()
           doWindDisplay();
           break;
         case 3: 
-          doPresDisplay();
+          doHumDisplay();
           break;
         case 4: 
           doBatDisplay();
@@ -623,7 +650,7 @@ void setup()
       break;
     case 3: 
       page = 3;
-      doPresDisplay();
+      doHumDisplay();
       break;
     case 4: 
       page = 4;
@@ -638,6 +665,7 @@ void setup()
             startWebserver();
           return;}
         }
+      startWifi();
       takeSamples();
       display.clearScreen();
       switch (page){
@@ -651,7 +679,7 @@ void setup()
           doWindDisplay();
           break;
         case 3: 
-          doPresDisplay();
+          doHumDisplay();
           break;
         case 4: 
           doBatDisplay();
