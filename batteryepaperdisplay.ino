@@ -7,6 +7,7 @@
 #include <AsyncElegantOTA.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <BlynkSimpleEsp32.h>
 AsyncWebServer server(80);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
@@ -36,6 +37,7 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
   float t, h, pres, barx;
+  float v41_value, v62_value;
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 2;
@@ -103,12 +105,36 @@ void gotosleep() {
       delay(1000);
 }
 
+BLYNK_CONNECTED() {
+  Blynk.syncVirtual(V41);
+  Blynk.syncVirtual(V62);
+  Blynk.syncVirtual(V78);
+  Blynk.syncVirtual(V79);
+  Blynk.syncVirtual(V82);
+}
+
+BLYNK_WRITE(V41) {
+  v41_value = param.asFloat();
+}
+BLYNK_WRITE(V62) {
+  v62_value = param.asFloat();
+}
+BLYNK_WRITE(V78) {
+  windspeed = param.asFloat();
+}
+BLYNK_WRITE(V79) {
+  windgust = param.asFloat();
+}
+BLYNK_WRITE(V82) {
+  fridgetemp = param.asFloat();
+}
+
 void startWifi(){
 
   //display.clearScreen();
   display.setPartialWindow(0, 0, display.width(), display.height());
   display.setCursor(0, 0);
-  display.firstpage();
+  display.firstPage();
 
   do {
     display.print("Connecting...");
@@ -138,7 +164,15 @@ void startWifi(){
     display.print("RSSI: ");
     display.println(WiFi.RSSI());
    display.display(true);
-          
+   display.print("Connecting to blynk...");
+  Blynk.config(bedroomauth, IPAddress(192, 168, 50, 197), 8080);
+  Blynk.connect();
+  while ((!Blynk.connected()) && (millis() < 15000)){
+      display.print(".");
+       display.display(true);
+       delay(500);}
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  
     struct tm timeinfo;
     getLocalTime(&timeinfo);
     time_t now = time(NULL);
@@ -557,23 +591,28 @@ void takeSamples(){
    pres = bmp.readPressure() / 100.0;
    float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
      if (WiFi.status() == WL_CONNECTED) {
-        float v41_value = fetchBlynkValue("V41", bedroomauth);
+        Blynk.syncVirtual(V41);
+        Blynk.syncVirtual(V62);
+        Blynk.syncVirtual(V78);
+        Blynk.syncVirtual(V79);
+        Blynk.syncVirtual(V82);
+        Blynk.run();
         display.print("North temp: ");
         display.println(v41_value);
-        display.display(true);
-        float v62_value = fetchBlynkValue("V62", bedroomauth);
+        //display.display(true);
+        //float v62_value = fetchBlynkValue("V62", bedroomauth);
         display.print("Neo temp: ");
         display.println(v62_value);
-        display.display(true);
-        windspeed = fetchBlynkValue("V78", bedroomauth);
+        //display.display(true);
+        //windspeed = fetchBlynkValue("V78", bedroomauth);
         display.print("Wind speed: ");
         display.println(windspeed);
-        display.display(true);
-        windgust = fetchBlynkValue("V79", bedroomauth);
+        //display.display(true);
+        //windgust = fetchBlynkValue("V79", bedroomauth);
         display.print("Wind gust: ");
         display.println(windgust);
-        display.display(true);
-        fridgetemp = fetchBlynkValue("V1", fridgeauth);
+        //display.display(true);
+        //fridgetemp = fetchBlynkValue("V1", fridgeauth);
         display.print("Fridge temp: ");
         display.println(fridgetemp);
         display.print("Time: ");
