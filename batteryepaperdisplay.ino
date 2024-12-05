@@ -32,7 +32,9 @@ RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
 RTC_DATA_ATTR float windspeed, windgust, fridgetemp;
-
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
+const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
   float t, h, pres, barx;
 
  RTC_DATA_ATTR   int firstrun = 100;
@@ -136,6 +138,23 @@ void startWifi(){
     display.print("RSSI: ");
     display.println(WiFi.RSSI());
    display.display(true);
+          
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+    time_t now = time(NULL);
+  localtime_r(&now, &timeinfo);
+
+  // Allocate a char array for the time string
+  char timeString[10]; // "12:34 PM" is 8 chars + null terminator
+
+  // Format the time string
+  if (timeinfo.tm_min < 10) {
+    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  } else {
+    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  }
+    display.println(timeString);
+    display.display(true);
 }
 
 void startWebserver(){
@@ -325,7 +344,19 @@ void doWindDisplay() {
 
 
     wipeScreen();
-    
+          time_t now = time(NULL);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+
+  // Allocate a char array for the time string
+  char timeString[10]; // "12:34 PM" is 8 chars + null terminator
+
+  // Format the time string
+  if (timeinfo.tm_min < 10) {
+    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  } else {
+    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  }
     
     do {
         display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
@@ -348,17 +379,19 @@ void doWindDisplay() {
         display.setCursor(5,32);
         display.print(array3[(maxArray - 1)], 1);
         display.print("c");
-        display.setCursor(148,32);
+        display.setCursor(140,32);
         display.print(windspeed, 0);
         display.print("kph");
-        display.setCursor(15,92);
+        display.setCursor(20,87);
         display.print(fridgetemp, 1);
         display.print("c");
-        display.setCursor(148,92);
+        display.setCursor(140,87);
         display.print(windgust, 0);
         display.print("kph");
 
         display.setTextSize(1);
+        display.setCursor(0, 114);
+        display.print(timeString);
     } while (display.nextPage());
 
     display.setFullWindow();
@@ -519,21 +552,31 @@ void takeSamples(){
    float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
      if (WiFi.status() == WL_CONNECTED) {
         float v41_value = fetchBlynkValue("V41", bedroomauth);
-        float v62_value = fetchBlynkValue("V62", bedroomauth);
-        windspeed = fetchBlynkValue("V78", bedroomauth);
-        windgust = fetchBlynkValue("V79", bedroomauth);
-        fridgetemp = fetchBlynkValue("V1", fridgeauth);
-        float min_value = min(v41_value, v62_value);
         display.print("North temp: ");
         display.println(v41_value);
+        display.display(true);
+        float v62_value = fetchBlynkValue("V62", bedroomauth);
         display.print("Neo temp: ");
         display.println(v62_value);
+        display.display(true);
+        windspeed = fetchBlynkValue("V78", bedroomauth);
         display.print("Wind speed: ");
         display.println(windspeed);
+        display.display(true);
+        windgust = fetchBlynkValue("V79", bedroomauth);
         display.print("Wind gust: ");
         display.println(windgust);
+        display.display(true);
+        fridgetemp = fetchBlynkValue("V1", fridgeauth);
         display.print("Fridge temp: ");
         display.println(fridgetemp);
+        display.display(true);
+        float min_value = min(v41_value, v62_value);
+
+
+
+
+
         display.display(true);
         for (int i = 0; i < (maxArray - 1); i++) {
             array3[i] = array3[i + 1];
@@ -567,7 +610,7 @@ void setup()
 {
   vBat = analogReadMilliVolts(0) / 500.0;
   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
-  
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   delay(50);
   pinMode(controlpin, OUTPUT);
   digitalWrite(controlpin, HIGH);
