@@ -2,13 +2,14 @@
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_BMP280.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <AsyncElegantOTA.h>
+//#include <AsyncTCP.h>
+//#include <ESPAsyncWebServer.h>
+//#include <AsyncElegantOTA.h>
+#include <ArduinoOTA.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <BlynkSimpleEsp32.h>
-AsyncWebServer server(80);
+
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 sensors_event_t humidity, temp;
@@ -37,7 +38,7 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
   float t, h, pres, barx;
-  float v41_value, v62_value;
+  float v41_value, v42_value, v62_value;
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 2;
@@ -59,7 +60,7 @@ GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ S
 
 const char* blynkserver = "192.168.50.197:9443";
 const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
-const char* fridgeauth = "VnFlJdW3V0uZQaqslqPJi6WPA9LaG1Pk";
+//const char* fridgeauth = "VnFlJdW3V0uZQaqslqPJi6WPA9LaG1Pk";
 
 // Virtual Pins
 const char* v41_pin = "V41";
@@ -107,6 +108,7 @@ void gotosleep() {
 
 BLYNK_CONNECTED() {
   Blynk.syncVirtual(V41);
+  Blynk.syncVirtual(V42);
   Blynk.syncVirtual(V62);
   Blynk.syncVirtual(V78);
   Blynk.syncVirtual(V79);
@@ -115,6 +117,10 @@ BLYNK_CONNECTED() {
 
 BLYNK_WRITE(V41) {
   v41_value = param.asFloat();
+}
+
+BLYNK_WRITE(V42) {
+  v42_value = param.asFloat();
 }
 BLYNK_WRITE(V62) {
   v62_value = param.asFloat();
@@ -221,12 +227,9 @@ void startWebserver(){
     display.print("Connected! to: ");
     display.println(WiFi.localIP());
   } while (display.nextPage());
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Hi! I am a little e-paper thing.");
-  });
-  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
-  server.begin();
-  display.println("Webserver started at /update");
+ArduinoOTA.setHostname("epaperdisplay");
+ ArduinoOTA.begin();
+  display.println("ArduinoOTA started");
     display.print("RSSI: ");
     display.println(WiFi.RSSI());
    display.display(true);
@@ -603,6 +606,8 @@ void takeSamples(){
         //float v62_value = fetchBlynkValue("V62", bedroomauth);
         display.print("Neo temp: ");
         display.println(v62_value);
+        display.print("Joju temp: ");
+        display.println(v42_value);
         //display.display(true);
         //windspeed = fetchBlynkValue("V78", bedroomauth);
         display.print("Wind speed: ");
@@ -618,7 +623,7 @@ void takeSamples(){
         display.print("Time: ");
         display.print(millis());
         display.display(true);
-        float min_value = min(v41_value, v62_value);
+        float min_value = min(v42_value, min(v41_value, v62_value));
 
 
 
@@ -783,7 +788,7 @@ void setup()
 
 void loop()
 {
-    //vBat = analogRead(0);
+ArduinoOTA.handle();
 if (!digitalRead(5)) {gotosleep();}
 delay(250);
     // Add a delay to sample data at intervals (e.g., every minute)
