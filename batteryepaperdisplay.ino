@@ -623,7 +623,8 @@ void takeSamples(){
         display.print("Time: ");
         display.print(millis());
         display.display(true);
-        float min_value = min(v42_value, min(v41_value, v62_value));
+        float min1 = min(v41_value, v62_value);
+        float min_value = min(v42_value, min1);
 
 
 
