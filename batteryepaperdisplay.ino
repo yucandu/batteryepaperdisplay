@@ -414,7 +414,9 @@ void doWindDisplay() {
         display.print("Gust:");
         display.setTextSize(3);
         display.setCursor(5,32);
-        display.print(array3[(maxArray - 1)], 1);
+        float temptodraw = array3[(maxArray - 1)];
+        if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
+        display.print(temptodraw, 1);
         display.print("c");
         display.setCursor(140,32);
         display.print(windspeed, 0);
