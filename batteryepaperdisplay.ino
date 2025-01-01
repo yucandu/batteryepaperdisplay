@@ -68,7 +68,23 @@ const char* v62_pin = "V62";
 
 float vBat;
 
+float findLowestNonZero(float a, float b, float c) {
+  // Initialize minimum to a very large value
+  float minimum = 999;
 
+  // Check each variable and update the minimum value
+  if (a != 0.0 && a < minimum) {
+    minimum = a;
+  }
+  if (b != 0.0 && b < minimum) {
+    minimum = b;
+  }
+  if (c != 0.0 && c < minimum) {
+    minimum = c;
+  }
+
+  return minimum;
+}
 
 void gotosleep() {
       WiFi.disconnect();
@@ -625,8 +641,7 @@ void takeSamples(){
         display.print("Time: ");
         display.print(millis());
         display.display(true);
-        float min1 = min(v41_value, v62_value);
-        float min_value = min(v42_value, min1);
+        float min_value = findLowestNonZero(v41_value, v42_value, v62_value);
 
 
 
@@ -659,6 +674,58 @@ void takeSamples(){
             array4[i] = array4[i + 1];
         }
         array4[(maxArray - 1)] = vBat;
+}
+
+void updateMain(){
+        //display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        //display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        //display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        //display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+          time_t now = time(NULL);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+
+  // Allocate a char array for the time string
+  char timeString[10]; // "12:34 PM" is 8 chars + null terminator
+
+  // Format the time string
+  if (timeinfo.tm_min < 10) {
+    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  } else {
+    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+  }
+    
+  display.setPartialWindow(0, 0, 122, 60);
+          display.setTextSize(3);
+        display.setCursor(5,32);
+        float temptodraw = array3[(maxArray - 1)];
+        if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
+        display.print(temptodraw, 1);
+        display.print("c");
+        display.display(true);
+
+        display.setPartialWindow(123, 0, 122, 60);
+
+        display.setCursor(140-123,32);
+        display.print(windspeed, 0);
+        display.print("kph");
+        display.display(true);
+
+        display.setPartialWindow(0, 61, 122, 60);
+        display.setCursor(20,87-61);
+        display.print(fridgetemp, 1);
+        display.print("c");
+        display.setTextSize(1);
+        display.setCursor(0, 114-61);
+        display.print(timeString);
+        display.display(true);
+
+        display.setPartialWindow(123, 61, 122, 60);
+        display.setCursor(140-123,87-61);
+        display.print(windgust, 0);
+        display.print("kph");
+        display.display(true);
+
 }
 
 void setup()
