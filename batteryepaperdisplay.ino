@@ -59,7 +59,7 @@ int readingTime;
 GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 
 const char* blynkserver = "192.168.50.197:9443";
-const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
+const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";  //hubert
 //const char* fridgeauth = "VnFlJdW3V0uZQaqslqPJi6WPA9LaG1Pk";
 
 // Virtual Pins
@@ -154,44 +154,45 @@ BLYNK_WRITE(V82) {
 void startWifi(){
 
   //display.clearScreen();
-  display.setPartialWindow(0, 0, display.width(), display.height());
-  display.setCursor(0, 0);
-  display.firstPage();
+  //display.setPartialWindow(0, 0, display.width(), display.height());
+  //display.setCursor(0, 0);
+  //display.firstPage();
 
-  do {
-    display.print("Connecting...");
-  } while (display.nextPage());
+  //do {
+  //  display.print("Connecting...");
+  //} while (display.nextPage());
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);  
   WiFi.setTxPower (WIFI_POWER_8_5dBm);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 20000) { display.print("!");}
+    if (millis() > 20000) { //display.print("!");
+    }
     if (millis() > 30000) {
         return;
       }
     //do {
-      display.print(".");
-       display.display(true);
+      //display.print(".");
+      // display.display(true);
     //} while (display.nextPage());
     delay(1000);
   }
-  wipeScreen();
-  display.setCursor(0, 0);
-  display.firstPage();
-  do {
-    display.print("Connected! to: ");
-    display.println(WiFi.localIP());
-  } while (display.nextPage());
-    display.print("RSSI: ");
-    display.println(WiFi.RSSI());
-   display.display(true);
-   display.print("Connecting to blynk...");
+  //wipeScreen();
+  //display.setCursor(0, 0);
+  //display.firstPage();
+  //do {
+    //display.print("Connected! to: ");
+    //display.println(WiFi.localIP());
+  //} while (display.nextPage());
+   // display.print("RSSI: ");
+  //  display.println(WiFi.RSSI());
+  // display.display(true);
+  // display.print("Connecting to blynk...");
   Blynk.config(bedroomauth, IPAddress(192, 168, 50, 197), 8080);
   Blynk.connect();
   while ((!Blynk.connected()) && (millis() < 15000)){
-      display.print(".");
-       display.display(true);
+     // display.print(".");
+     //  display.display(true);
        delay(500);}
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
   
@@ -204,13 +205,13 @@ void startWifi(){
   char timeString[10]; // "12:34 PM" is 8 chars + null terminator
 
   // Format the time string
-  if (timeinfo.tm_min < 10) {
+ /* if (timeinfo.tm_min < 10) {
     snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
   } else {
     snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
   }
     display.println(timeString);
-    display.display(true);
+    display.display(true);*/
 }
 
 void startWebserver(){
@@ -269,8 +270,7 @@ void wipeScreen(){
     display.firstPage();
 
     //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
-    barx = mapf (vBat, 3.3, 4.15, 0, 19);
-    if (barx > 19) {barx = 19;}
+
 }
 
 void setupChart(){
@@ -396,65 +396,12 @@ void doWindDisplay() {
 
 
 
-    wipeScreen();
-          time_t now = time(NULL);
-  struct tm timeinfo;
-  localtime_r(&now, &timeinfo);
 
-  // Allocate a char array for the time string
-  char timeString[10]; // "12:34 PM" is 8 chars + null terminator
-
-  // Format the time string
-  if (timeinfo.tm_min < 10) {
-    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  } else {
-    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  }
-    
-    do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
         
 
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.setTextSize(2);
-        display.setCursor(32,2);
-        display.print("Temp:");
-        display.setCursor(158,2);
-        display.print("Wind:");
-        display.setCursor(24,64);
-        display.print("Fridge:");
-        display.setCursor(158,64);
-        display.print("Gust:");
-        display.setTextSize(3);
-        display.setCursor(5,32);
-        float temptodraw = array3[(maxArray - 1)];
-        if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
-        display.print(temptodraw, 1);
-        display.print("c");
-        display.setCursor(140,32);
-        display.print(windspeed, 0);
-        display.print("kph");
-        display.setCursor(20,87);
-        display.print(fridgetemp, 1);
-        display.print("c");
-        display.setCursor(140,87);
-        display.print(windgust, 0);
-        display.print("kph");
 
-        display.setTextSize(1);
-        display.setCursor(0, 114);
-        display.print(timeString);
-        display.drawRect(229,114,19,7,GxEPD_BLACK);
-        display.fillRect(229,114,barx,7,GxEPD_BLACK); 
-        display.drawLine(248,115,248,119,GxEPD_BLACK);
-        display.drawLine(249,115,249,119,GxEPD_BLACK);
-    } while (display.nextPage());
-
-    display.setFullWindow();
-    gotosleep();
+  updateMain();
+  gotosleep();
 }
 
 void doPresDisplay() {
@@ -612,47 +559,61 @@ void takeSamples(){
    pres = bmp.readPressure() / 100.0;
    float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
      if (WiFi.status() == WL_CONNECTED) {
-        Blynk.syncVirtual(V41);
-        Blynk.syncVirtual(V62);
-        Blynk.syncVirtual(V78);
-        Blynk.syncVirtual(V79);
-        Blynk.syncVirtual(V82);
-        Blynk.run();
-        display.print("North temp: ");
-        display.println(v41_value);
-        //display.display(true);
-        //float v62_value = fetchBlynkValue("V62", bedroomauth);
-        display.print("Neo temp: ");
-        display.println(v62_value);
-        display.print("Joju temp: ");
-        display.println(v42_value);
-        //display.display(true);
-        //windspeed = fetchBlynkValue("V78", bedroomauth);
-        display.print("Wind speed: ");
-        display.println(windspeed);
-        //display.display(true);
-        //windgust = fetchBlynkValue("V79", bedroomauth);
-        display.print("Wind gust: ");
-        display.println(windgust);
-        //display.display(true);
-        //fridgetemp = fetchBlynkValue("V1", fridgeauth);
-        display.print("Fridge temp: ");
-        display.println(fridgetemp);
-        display.print("Time: ");
-        display.print(millis());
-        display.display(true);
-        float min_value = findLowestNonZero(v41_value, v42_value, v62_value);
+          Blynk.syncVirtual(V41);
+          Blynk.syncVirtual(V62);
+          Blynk.syncVirtual(V78);
+          Blynk.syncVirtual(V79);
+          Blynk.syncVirtual(V82);
+          Blynk.virtualWrite(V91, t);
+          Blynk.run();
+          Blynk.virtualWrite(V92, h);
+          Blynk.run();
+          Blynk.virtualWrite(V93, pres);
+          Blynk.run();
+          Blynk.virtualWrite(V94, abshum);
+          Blynk.run();
+          Blynk.virtualWrite(V95, vBat);
+          Blynk.run();
+          Blynk.virtualWrite(V95, vBat);
+          Blynk.run();
+          /*display.print("North temp: ");
+          display.println(v41_value);
+          //display.display(true);
+          //float v62_value = fetchBlynkValue("V62", bedroomauth);
+          display.print("Neo temp: ");
+          display.println(v62_value);
+          display.print("Joju temp: ");
+          display.println(v42_value);
+          //display.display(true);
+          //windspeed = fetchBlynkValue("V78", bedroomauth);
+          display.print("Wind speed: ");
+          display.println(windspeed);
+          //display.display(true);
+          //windgust = fetchBlynkValue("V79", bedroomauth);
+          display.print("Wind gust: ");
+          display.println(windgust);
+          //display.display(true);
+          //fridgetemp = fetchBlynkValue("V1", fridgeauth);
+          display.print("Fridge temp: ");
+          display.println(fridgetemp);
+          display.print("Time: ");
+          display.print(millis());
+          display.display(true);*/
+          float min_value = findLowestNonZero(v41_value, v42_value, v62_value);
 
 
 
 
 
-        display.display(true);
-        for (int i = 0; i < (maxArray - 1); i++) {
-            array3[i] = array3[i + 1];
+          //display.display(true);
+
+          if (min_value != 999) {
+            for (int i = 0; i < (maxArray - 1); i++) {
+                array3[i] = array3[i + 1];
+            }
+            array3[(maxArray - 1)] = min_value;
+          }
         }
-        array3[(maxArray - 1)] = min_value;
-     }
 
         if (readingCount < maxArray) {
             readingCount++;
@@ -694,37 +655,71 @@ void updateMain(){
   } else {
     snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
   }
-    
-  display.setPartialWindow(0, 0, 122, 60);
-          display.setTextSize(3);
+    display.setFullWindow();
+    //display.fillScreen(GxEPD_WHITE);
+        //display.setPartialWindow(0, 0, display.width()/2, display.height()/2);
+        display.fillRect(0,0,display.width()/2,display.height()/2,GxEPD_WHITE);
+        
+        display.setTextSize(3);
         display.setCursor(5,32);
         float temptodraw = array3[(maxArray - 1)];
         if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
         display.print(temptodraw, 1);
         display.print("c");
-        display.display(true);
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+        display.displayWindow(0, 0, display.width()/2, display.height()/2);
 
-        display.setPartialWindow(123, 0, 122, 60);
-
-        display.setCursor(140-123,32);
+        
+        display.fillRect(display.width()/2,0,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillScreen(GxEPD_WHITE);
+        display.setCursor(140,32);
         display.print(windspeed, 0);
         display.print("kph");
-        display.display(true);
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+        display.displayWindow(display.width()/2, 0, display.width()/2, display.height()/2);
 
-        display.setPartialWindow(0, 61, 122, 60);
-        display.setCursor(20,87-61);
+        
+        display.fillRect(0,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillScreen(GxEPD_WHITE);
+        display.setCursor(20,87);
         display.print(fridgetemp, 1);
         display.print("c");
         display.setTextSize(1);
-        display.setCursor(0, 114-61);
+        display.setCursor(0, 114-2);
         display.print(timeString);
-        display.display(true);
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+        display.displayWindow(0, display.height()/2, display.width()/2, display.height()/2);
 
-        display.setPartialWindow(123, 61, 122, 60);
-        display.setCursor(140-123,87-61);
+        
+        
+        display.setTextSize(3);
+        display.fillRect(display.width()/2,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillScreen(GxEPD_WHITE);
+        display.setCursor(140,87);
         display.print(windgust, 0);
         display.print("kph");
-        display.display(true);
+        barx = mapf (vBat, 3.3, 4.15, 0, 19);
+        if (barx > 19) {barx = 19;}
+        display.drawRect(229,114-2,19,7,GxEPD_BLACK);
+        display.fillRect(229,114-2,barx,7,GxEPD_BLACK); 
+        display.drawLine(248,115-2,248,119-2,GxEPD_BLACK);
+        display.drawLine(249,115-2,249,119-2,GxEPD_BLACK);
+
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+        display.displayWindow(display.width()/2, display.height()/2, display.width()/2, display.height()/2);
+        //display.display(true);
 
 }
 
@@ -774,7 +769,10 @@ void setup()
     }*/
             
   if (firstrun >= 100) {display.clearScreen();
-  
+   if (page == 2){
+        wipeScreen();
+
+   }
   firstrun = 0;}
   firstrun++;
 
@@ -811,7 +809,8 @@ void setup()
       break;
     case 2: 
       page = 2;
-      doWindDisplay();
+        wipeScreen();
+        doWindDisplay();
       break;
     case 3: 
       page = 3;
