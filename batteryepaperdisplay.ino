@@ -42,7 +42,7 @@ const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 2;
-
+float abshum;
  float minVal = 3.9;
  float maxVal = 4.2;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
@@ -166,16 +166,16 @@ void startWifi(){
   WiFi.setTxPower (WIFI_POWER_8_5dBm);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 20000) { //display.print("!");
+    if (millis() > 10000) { //display.print("!");
+      WiFi.setTxPower(WIFI_POWER_8_5dBm);
     }
-    if (millis() > 30000) {
+    if (millis() > 20000) {
         return;
       }
     //do {
       //display.print(".");
       // display.display(true);
     //} while (display.nextPage());
-    delay(1000);
   }
   //wipeScreen();
   //display.setCursor(0, 0);
@@ -190,12 +190,23 @@ void startWifi(){
   // display.print("Connecting to blynk...");
   Blynk.config(bedroomauth, IPAddress(192, 168, 50, 197), 8080);
   Blynk.connect();
-  while ((!Blynk.connected()) && (millis() < 15000)){
+  while ((!Blynk.connected()) && (millis() < 20000)){
      // display.print(".");
      //  display.display(true);
        delay(500);}
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-  
+            Blynk.virtualWrite(V91, t);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          Blynk.virtualWrite(V92, h);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          Blynk.virtualWrite(V93, pres);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          Blynk.virtualWrite(V94, abshum);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          Blynk.virtualWrite(V95, vBat);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          Blynk.virtualWrite(V95, vBat);
+          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
     struct tm timeinfo;
     getLocalTime(&timeinfo);
     time_t now = time(NULL);
@@ -244,8 +255,8 @@ void startWebserver(){
     display.print("Connected! to: ");
     display.println(WiFi.localIP());
   } while (display.nextPage());
-ArduinoOTA.setHostname("epaperdisplay");
- ArduinoOTA.begin();
+  ArduinoOTA.setHostname("epaperdisplay");
+  ArduinoOTA.begin();
   display.println("ArduinoOTA started");
     display.print("RSSI: ");
     display.println(WiFi.RSSI());
@@ -398,7 +409,7 @@ void doWindDisplay() {
 
 
         
-
+wipeScreen();
 
   updateMain();
   gotosleep();
@@ -542,40 +553,14 @@ float fetchBlynkValue(const char* vpin, const char* authToken) {
 }
 
 void takeSamples(){
-  Wire.begin();  
 
-  aht.begin();
-  bmp.begin();
-  bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
-                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                  Adafruit_BMP280::STANDBY_MS_500);
-  bmp.takeForcedMeasurement();
-  
-  aht.getEvent(&humidity, &temp);
-   t = temp.temperature;
-   h = humidity.relative_humidity;
-   pres = bmp.readPressure() / 100.0;
-   float abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
      if (WiFi.status() == WL_CONNECTED) {
           Blynk.syncVirtual(V41);
           Blynk.syncVirtual(V62);
           Blynk.syncVirtual(V78);
           Blynk.syncVirtual(V79);
           Blynk.syncVirtual(V82);
-          Blynk.virtualWrite(V91, t);
-          Blynk.run();
-          Blynk.virtualWrite(V92, h);
-          Blynk.run();
-          Blynk.virtualWrite(V93, pres);
-          Blynk.run();
-          Blynk.virtualWrite(V94, abshum);
-          Blynk.run();
-          Blynk.virtualWrite(V95, vBat);
-          Blynk.run();
-          Blynk.virtualWrite(V95, vBat);
-          Blynk.run();
+
           /*display.print("North temp: ");
           display.println(v41_value);
           //display.display(true);
@@ -656,36 +641,44 @@ void updateMain(){
     snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
   }
     display.setFullWindow();
-    //display.fillScreen(GxEPD_WHITE);
+    display.fillScreen(GxEPD_WHITE);
         //display.setPartialWindow(0, 0, display.width()/2, display.height()/2);
-        display.fillRect(0,0,display.width()/2,display.height()/2,GxEPD_WHITE);
-        
+        //display.fillRect(0,0,display.width()/2,display.height()/2,GxEPD_WHITE);
+        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
+        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
+        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
+        //display.displayWindow(0, 0, display.width()/2, display.height()/2);
+        display.setTextSize(2);
+        display.setCursor(32,2);
+        display.print("Temp:");
+        display.setCursor(158,2);
+        display.print("Wind:");
+        display.setCursor(24,64);
+        display.print("Fridge:");
+        display.setCursor(158,64);
+        display.print("Gust:");
         display.setTextSize(3);
         display.setCursor(5,32);
         float temptodraw = array3[(maxArray - 1)];
         if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
         display.print(temptodraw, 1);
         display.print("c");
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(0, 0, display.width()/2, display.height()/2);
 
         
-        display.fillRect(display.width()/2,0,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillRect(display.width()/2,0,display.width()/2,display.height()/2,GxEPD_WHITE);
         //display.fillScreen(GxEPD_WHITE);
         display.setCursor(140,32);
         display.print(windspeed, 0);
         display.print("kph");
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
         display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
         display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
         display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(display.width()/2, 0, display.width()/2, display.height()/2);
+        display.displayWindow(display.width()/2, 0, display.width()/2, display.height()/2);*/
 
         
-        display.fillRect(0,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillRect(0,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
         //display.fillScreen(GxEPD_WHITE);
         display.setCursor(20,87);
         display.print(fridgetemp, 1);
@@ -693,16 +686,16 @@ void updateMain(){
         display.setTextSize(1);
         display.setCursor(0, 114-2);
         display.print(timeString);
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
         display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
         display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
         display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(0, display.height()/2, display.width()/2, display.height()/2);
+        display.displayWindow(0, display.height()/2, display.width()/2, display.height()/2);*/
 
         
         
         display.setTextSize(3);
-        display.fillRect(display.width()/2,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
+        //display.fillRect(display.width()/2,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
         //display.fillScreen(GxEPD_WHITE);
         display.setCursor(140,87);
         display.print(windgust, 0);
@@ -714,12 +707,12 @@ void updateMain(){
         display.drawLine(248,115-2,248,119-2,GxEPD_BLACK);
         display.drawLine(249,115-2,249,119-2,GxEPD_BLACK);
 
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
+        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
         display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
         display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
         display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(display.width()/2, display.height()/2, display.width()/2, display.height()/2);
-        //display.display(true);
+        display.displayWindow(display.width()/2, display.height()/2, display.width()/2, display.height()/2);*/
+        display.display(true);
 
 }
 
@@ -727,6 +720,23 @@ void setup()
 {
   vBat = analogReadMilliVolts(0) / 500.0;
   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
+  Wire.begin();  
+
+  aht.begin();
+  bmp.begin();
+  bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500);
+  bmp.takeForcedMeasurement();
+  
+  aht.getEvent(&humidity, &temp);
+   t = temp.temperature;
+   h = humidity.relative_humidity;
+   pres = bmp.readPressure() / 100.0;
+    abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
+
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   delay(50);
   pinMode(controlpin, OUTPUT);
