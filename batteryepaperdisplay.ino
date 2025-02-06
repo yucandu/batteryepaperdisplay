@@ -27,7 +27,7 @@ const char* password = "springchicken";
 
 #define sleeptimeSecs 300
 #define maxArray 501
-#define controlpin 10
+
 
 RTC_DATA_ATTR float array1[maxArray];
 RTC_DATA_ATTR float array2[maxArray];
@@ -56,7 +56,8 @@ int readingTime;
 #include <Fonts/DejaVu_Serif_Condensed_36.h>
 #include <Fonts/DejaVu_Serif_Condensed_60.h>
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
-GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
+//GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
+GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
 
 const char* blynkserver = "192.168.50.197:9443";
 const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";  //hubert
@@ -101,7 +102,7 @@ void gotosleep() {
       pinMode(3, INPUT_PULLUP );
       pinMode(0, INPUT_PULLUP );
       pinMode(5, INPUT_PULLUP );
-      pinMode(controlpin, INPUT);
+
 
       //delay(10000);
       //rtc_gpio_isolate(gpio_num_t(SDA));
@@ -109,7 +110,7 @@ void gotosleep() {
       //periph_module_disable(PERIPH_I2C0_MODULE);  
       //digitalWrite(SDA, 0);
       //digitalWrite(SCL, 0);
-      uint64_t bitmask = BUTTON_PIN_BITMASK(GPIO_NUM_1) | BUTTON_PIN_BITMASK(GPIO_NUM_2) | BUTTON_PIN_BITMASK(GPIO_NUM_3) | BUTTON_PIN_BITMASK(GPIO_NUM_4) | BUTTON_PIN_BITMASK(GPIO_NUM_5);
+      uint64_t bitmask = BUTTON_PIN_BITMASK(GPIO_NUM_1) | BUTTON_PIN_BITMASK(GPIO_NUM_2) | BUTTON_PIN_BITMASK(GPIO_NUM_3) | BUTTON_PIN_BITMASK(GPIO_NUM_0) | BUTTON_PIN_BITMASK(GPIO_NUM_5);
    //   esp_deep_sleep_enable_gpio_wakeup(1 << 0, ESP_GPIO_WAKEUP_GPIO_LOW);
     //  esp_deep_sleep_enable_gpio_wakeup(1 << 1, ESP_GPIO_WAKEUP_GPIO_LOW);
    //   esp_deep_sleep_enable_gpio_wakeup(1 << 2, ESP_GPIO_WAKEUP_GPIO_LOW);
@@ -284,36 +285,46 @@ void wipeScreen(){
 
 }
 
-void setupChart(){
-        
-        display.setCursor(0, 0);
-        display.print("<");
-        display.print(maxVal, 3);
-        display.setCursor(0, 114);
-        display.print("<");
-        display.print(minVal, 3);
-        display.setCursor(110, 114);
-        display.print("<#");
-        display.print(readingCount - 1, 0);
-        display.print("*");
-        display.print(sleeptimeSecs, 0);
-        display.print("s>");
-        display.drawRect(229,114,19,7,GxEPD_BLACK);
-        display.fillRect(229,114,barx,7,GxEPD_BLACK); 
-        display.drawLine(248,115,248,119,GxEPD_BLACK);
-        display.drawLine(249,115,249,119,GxEPD_BLACK);
-        display.setCursor(125, 0);
+void setupChart() {
+    display.setCursor(0, 0);
+    display.print("<");
+    display.print(maxVal, 3);
+    
+    // Adjusted for bottom of 200x200 display
+    display.setCursor(0, 199);
+    display.print("<");
+    display.print(minVal, 3);
+
+    // Adjusted for horizontal placement of the additional text
+    display.setCursor(160, 199);
+    display.print("<#");
+    display.print(readingCount - 1, 0);
+    display.print("*");
+    display.print(sleeptimeSecs, 0);
+    display.print("s>");
+
+    // Adjusted rectangle and progress bar to fit within bounds
+    display.drawRect(179, 192, 19, 7, GxEPD_BLACK); // Rectangle moved to fit fully within 200x200
+    display.fillRect(179, 192, barx, 7, GxEPD_BLACK); // Progress bar inside the rectangle
+
+    // Adjusted marker lines to stay within bounds
+    display.drawLine(198, 193, 198, 198, GxEPD_BLACK); 
+    display.drawLine(199, 193, 199, 198, GxEPD_BLACK);
+
+    // Set the cursor for additional chart decorations
+    display.setCursor(125, 0); 
 }
 
-double mapf(float x, float in_min, float in_max, float out_min, float out_max)
-{
+
+
+double mapf(float x, float in_min, float in_max, float out_min, float out_max){
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 void doTempDisplay() {
     // Recalculate min and max values
-     minVal = array1[maxArray - readingCount];
-     maxVal = array1[maxArray - readingCount];
+    minVal = array1[maxArray - readingCount];
+    maxVal = array1[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if (array1[i] != 0) {  // Only consider non-zero values
@@ -326,30 +337,35 @@ void doTempDisplay() {
         }
     }
 
-    // Calculate scaling factors
-    float yScale = 121.0 / (maxVal - minVal);
-    float xStep = 250.0 / (readingCount - 1);
+    // Calculate scaling factors for full 200x200 display
+    float yScale = 199.0 / (maxVal - minVal); // Adjusted for full vertical range
+    float xStep = 200.0 / (readingCount - 1); // Adjusted for full horizontal range
 
     wipeScreen();
-    
+
     do {
         display.fillRect(0, 0, display.width(), display.height(), GxEPD_WHITE);
-        
+
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
-            int y0 = 121 - ((array1[i] - minVal) * yScale);
+            int y0 = 199 - ((array1[i] - minVal) * yScale); // Full vertical range
             int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
-            int y1 = 121 - ((array1[i + 1] - minVal) * yScale);
+            int y1 = 199 - ((array1[i + 1] - minVal) * yScale); // Full vertical range
 
             // Only draw a line for valid (non-zero) values
             if (array1[i] != 0) {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+
+        // Call setupChart to draw chart decorations
         setupChart();
+
+        // Display temperature information at the bottom
+        display.setCursor(10, 190); // Positioned near the bottom for readability
         display.print("[");
         display.print("Temp: ");
-        display.print(array1[(maxArray - 1)], 3);
+        display.print(array1[maxArray - 1], 3);
         display.print("c");
         display.print("]");
     } while (display.nextPage());
@@ -358,10 +374,11 @@ void doTempDisplay() {
     gotosleep();
 }
 
+
 void doHumDisplay() {
     // Recalculate min and max values
-     minVal = array2[maxArray - readingCount];
-     maxVal = array2[maxArray - readingCount];
+    minVal = array2[maxArray - readingCount];
+    maxVal = array2[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array2[i] < minVal) && (array2[i] > 0)) {
@@ -372,25 +389,25 @@ void doHumDisplay() {
         }
     }
 
-    // Calculate scaling factors
-    float yScale = 121.0 / (maxVal - minVal);
-    float xStep = 250.0 / (readingCount - 1);
+    // Adjust scaling factors
+    float yScale = 199.0 / (maxVal - minVal); // Adjusted for full vertical range
+    float xStep = 200.0 / (readingCount - 1); // Adjusted for full horizontal range
 
     wipeScreen();
-    
-    
+
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        
+        display.fillRect(0, 0, display.width(), display.height(), GxEPD_WHITE);
+
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
-            int y0 = 121 - ((array2[i] - minVal) * yScale);
+            int y0 = 199 - ((array2[i] - minVal) * yScale); // Adjusted for vertical range
             int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
-            int y1 = 121 - ((array2[i + 1] - minVal) * yScale);
+            int y1 = 199 - ((array2[i + 1] - minVal) * yScale); // Adjusted for vertical range
             if (array2[i] > 0) {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+
         setupChart();
         display.print("[");
         display.print("Hum: ");
@@ -409,7 +426,7 @@ void doWindDisplay() {
 
 
         
-wipeScreen();
+ wipeScreen();
 
   updateMain();
   gotosleep();
@@ -417,8 +434,8 @@ wipeScreen();
 
 void doPresDisplay() {
     // Recalculate min and max values
-     minVal = array3[maxArray - readingCount];
-     maxVal = array3[maxArray - readingCount];
+    minVal = array3[maxArray - readingCount];
+    maxVal = array3[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array3[i] < minVal) && (array3[i] > 0)) {
@@ -429,25 +446,25 @@ void doPresDisplay() {
         }
     }
 
-    // Calculate scaling factors
-    float yScale = 121.0 / (maxVal - minVal);
-    float xStep = 250.0 / (readingCount - 1);
+    // Adjust scaling factors
+    float yScale = 199.0 / (maxVal - minVal); // Adjusted for full vertical range
+    float xStep = 200.0 / (readingCount - 1); // Adjusted for full horizontal range
 
     wipeScreen();
-    
-    
+
     do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
-        
+        display.fillRect(0, 0, display.width(), display.height(), GxEPD_WHITE);
+
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
-            int y0 = 121 - ((array3[i] - minVal) * yScale);
+            int y0 = 199 - ((array3[i] - minVal) * yScale); // Adjusted for vertical range
             int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
-            int y1 = 121 - ((array3[i + 1] - minVal) * yScale);
+            int y1 = 199 - ((array3[i + 1] - minVal) * yScale); // Adjusted for vertical range
             if (array3[i] > 0) {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+
         setupChart();
         display.print("[");
         display.print("Pres: ");
@@ -460,10 +477,11 @@ void doPresDisplay() {
     gotosleep();
 }
 
+
 void doBatDisplay() {
     // Recalculate min and max values
-     minVal = array4[maxArray - readingCount];
-     maxVal = array4[maxArray - readingCount];
+    minVal = array4[maxArray - readingCount];
+    maxVal = array4[maxArray - readingCount];
 
     for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
         if ((array4[i] < minVal) && (array4[i] > 0)) {
@@ -474,41 +492,41 @@ void doBatDisplay() {
         }
     }
 
-    // Calculate scaling factors
-    float yScale = 121.0 / (maxVal - minVal);
-    float xStep = 250.0 / (readingCount - 1);
+    // Adjust scaling factors
+    float yScale = 199.0 / (maxVal - minVal); // Adjusted for full vertical range
+    float xStep = 200.0 / (readingCount - 1); // Adjusted for full horizontal range
 
     wipeScreen();
-    
-    
-    do {
-        display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
 
-        
+    do {
+        display.fillRect(0, 0, display.width(), display.height(), GxEPD_WHITE);
+
         for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
             int x0 = (i - (maxArray - readingCount)) * xStep;
-            int y0 = 121 - ((array4[i] - minVal) * yScale);
+            int y0 = 199 - ((array4[i] - minVal) * yScale); // Adjusted for vertical range
             int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
-            int y1 = 121 - ((array4[i + 1] - minVal) * yScale);
+            int y1 = 199 - ((array4[i + 1] - minVal) * yScale); // Adjusted for vertical range
             if (array4[i] > 0) {
                 display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
             }
         }
+
         display.setCursor(0, 0);
         display.print("<");
         display.print(maxVal, 3);
-        display.setCursor(0, 114);
+        display.setCursor(0, 193); // Adjusted to stay 7px from the bottom
         display.print("<");
         display.print(minVal, 3);
-        display.setCursor(120, 114);
+        display.setCursor(120, 193); // Adjusted for new width
         display.print("<#");
         display.print(readingCount - 1, 0);
         display.print("*");
         display.print(sleeptimeSecs, 0);
         display.print("s>");
-        display.setCursor(175, 114);
+        display.setCursor(175, 193); // Adjusted for new width
+
         int batPct = mapf(vBat, 3.3, 4.15, 0, 100);
-        display.setCursor(125, 0);
+        display.setCursor(125, 0); // Same placement
         display.print("[vBat: ");
         display.print(vBat, 3);
         display.print("v/");
@@ -519,6 +537,7 @@ void doBatDisplay() {
     display.setFullWindow();
     gotosleep();
 }
+
 
 float fetchBlynkValue(const char* vpin, const char* authToken) {
   WiFiClientSecure client;
@@ -622,99 +641,84 @@ void takeSamples(){
         array4[(maxArray - 1)] = vBat;
 }
 
-void updateMain(){
-        //display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        //display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        //display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        //display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-          time_t now = time(NULL);
-  struct tm timeinfo;
-  localtime_r(&now, &timeinfo);
+void updateMain() {
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
 
-  // Allocate a char array for the time string
-  char timeString[10]; // "12:34 PM" is 8 chars + null terminator
+    // Allocate a char array for the time string
+    char timeString[10]; // "12:34 PM" is 8 chars + null terminator
 
-  // Format the time string
-  if (timeinfo.tm_min < 10) {
-    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  } else {
-    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  }
+    // Format the time string
+    if (timeinfo.tm_min < 10) {
+        snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+    } else {
+        snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
+    }
+
     display.setFullWindow();
     display.fillScreen(GxEPD_WHITE);
-        //display.setPartialWindow(0, 0, display.width()/2, display.height()/2);
-        //display.fillRect(0,0,display.width()/2,display.height()/2,GxEPD_WHITE);
-        display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        //display.displayWindow(0, 0, display.width()/2, display.height()/2);
-        display.setTextSize(2);
-        display.setCursor(32,2);
-        display.print("Temp:");
-        display.setCursor(158,2);
-        display.print("Wind:");
-        display.setCursor(24,64);
-        display.print("Fridge:");
-        display.setCursor(158,64);
-        display.print("Gust:");
-        display.setTextSize(3);
-        display.setCursor(5,32);
-        float temptodraw = array3[(maxArray - 1)];
-        if ((temptodraw > 0) && (temptodraw < 10)) {display.print(" ");}
-        display.print(temptodraw, 1);
-        display.print("c");
 
-        
-        //display.fillRect(display.width()/2,0,display.width()/2,display.height()/2,GxEPD_WHITE);
-        //display.fillScreen(GxEPD_WHITE);
-        display.setCursor(140,32);
-        display.print(windspeed, 0);
-        display.print("kph");
-        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(display.width()/2, 0, display.width()/2, display.height()/2);*/
+    // Draw crosshair lines to divide the screen into 4 quadrants
+    display.drawLine(99, 0, 99, 200, GxEPD_BLACK);  // Vertical center line
+    display.drawLine(100, 0, 100, 200, GxEPD_BLACK); // Vertical center line (thicker)
+    display.drawLine(0, 99, 200, 99, GxEPD_BLACK);  // Horizontal center line
+    display.drawLine(0, 100, 200, 100, GxEPD_BLACK); // Horizontal center line (thicker)
 
-        
-        //display.fillRect(0,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
-        //display.fillScreen(GxEPD_WHITE);
-        display.setCursor(20,87);
-        display.print(fridgetemp, 1);
-        display.print("c");
-        display.setTextSize(1);
-        display.setCursor(0, 114-2);
-        display.print(timeString);
-        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(0, display.height()/2, display.width()/2, display.height()/2);*/
+    // Quadrant 1: Top-left
+    display.setTextSize(1); // Font size 2 (16px)
+    display.setCursor(24, 2); // Adjusted to fit top-left quadrant
+    display.print("Temp:");
+    display.setCursor(6, 40); // Centered vertically in quadrant
+    display.setTextSize(2); // Font size 3 (24px)
+    float temptodraw = array3[(maxArray - 1)];
+    if ((temptodraw > 0) && (temptodraw < 10)) { display.print(" "); }
+    display.print(temptodraw, 1);
+    display.print("c");
 
-        
-        
-        display.setTextSize(3);
-        //display.fillRect(display.width()/2,display.height()/2,display.width()/2,display.height()/2,GxEPD_WHITE);
-        //display.fillScreen(GxEPD_WHITE);
-        display.setCursor(140,87);
-        display.print(windgust, 0);
-        display.print("kph");
-        barx = mapf (vBat, 3.3, 4.15, 0, 19);
-        if (barx > 19) {barx = 19;}
-        display.drawRect(229,114-2,19,7,GxEPD_BLACK);
-        display.fillRect(229,114-2,barx,7,GxEPD_BLACK); 
-        display.drawLine(248,115-2,248,119-2,GxEPD_BLACK);
-        display.drawLine(249,115-2,249,119-2,GxEPD_BLACK);
+    // Quadrant 2: Top-right
+    display.setTextSize(1); // Font size 2 (16px)
+    display.setCursor(124, 2); // Adjusted to fit top-right quadrant
+    display.print("Wind:");
+    display.setCursor(130, 40); // Centered vertically in quadrant
+    display.setTextSize(2); // Font size 3 (24px)
+    display.print(windspeed, 0);
+    display.print("kph");
 
-        /*display.drawLine(122, 0, 122, 122, GxEPD_BLACK);
-        display.drawLine(123, 0, 123, 122, GxEPD_BLACK);
-        display.drawLine(0, 60, 250, 60, GxEPD_BLACK);
-        display.drawLine(0, 61, 250, 61, GxEPD_BLACK);
-        display.displayWindow(display.width()/2, display.height()/2, display.width()/2, display.height()/2);*/
-        display.display(true);
+    // Quadrant 3: Bottom-left
+    display.setTextSize(1); // Font size 2 (16px)
+    display.setCursor(24, 104); // Adjusted for bottom-left quadrant
+    display.print("Fridge:");
+    display.setCursor(20, 140); // Centered vertically in quadrant
+    display.setTextSize(2); // Font size 3 (24px)
+    display.print(fridgetemp, 1);
+    display.print("c");
 
+    // Quadrant 4: Bottom-right
+    display.setTextSize(1); // Font size 2 (16px)
+    display.setCursor(124, 104); // Adjusted for bottom-right quadrant
+    display.print("Gust:");
+    display.setCursor(130, 140); // Centered vertically in quadrant
+    display.setTextSize(2); // Font size 3 (24px)
+    display.print(windgust, 0);
+    display.print("kph");
+
+    // Display time string near the bottom-left corner
+    display.setTextSize(1); // Font size 1 (8px)
+    display.setCursor(0, 192); // 8px above the bottom
+    display.print(timeString);
+
+    // Battery status (bottom-right)
+    int barx = mapf(vBat, 3.3, 4.15, 0, 19); // Map battery value to progress bar width
+    if (barx > 19) { barx = 19; }
+    display.drawRect(179, 192, 19, 7, GxEPD_BLACK); // Battery outline (adjusted for 200x200)
+    display.fillRect(179, 192, barx, 7, GxEPD_BLACK); // Battery fill
+    display.drawLine(198, 193, 198, 198, GxEPD_BLACK); // Tick marks on battery
+    display.drawLine(199, 193, 199, 198, GxEPD_BLACK); // Tick marks on battery
+    display.drawRect(0,0, display.width(), display.height(), GxEPD_BLACK);
+    display.display(true);
 }
+
 
 void setup()
 {
@@ -739,44 +743,22 @@ void setup()
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   delay(50);
-  pinMode(controlpin, OUTPUT);
-  digitalWrite(controlpin, HIGH);
+
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(3);
   display.setTextSize(1);
-  pinMode(5, INPUT_PULLUP );
+  pinMode(0, INPUT_PULLUP);
+  pinMode(1, INPUT_PULLUP);
+  pinMode(2, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP);
+
+  pinMode(5, INPUT_PULLUP);
 
 
 
    
   delay(10);
 
-
-  //display.setFont(&Roboto_Condensed_12);
-
-  /*if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED) {
-      Wire.begin();  
-
-      aht.begin();
-
-      aht.getEvent(&humidity, &temp);
-      t = temp.temperature;
-      h = humidity.relative_humidity;
-      pres = bmp.readPressure() / 100.0;
-      display.setTextColor(GxEPD_BLACK, GxEPD_WHITE);
-  display.clearScreen();
-  display.setPartialWindow(0, 0, display.width(), display.height());
-  display.setCursor(0, 10);
-      display.print("Current temp:" );
-      display.print(t);
-      display.println("c");
-      display.setTextColor(GxEPD_WHITE, GxEPD_BLACK);
-      display.print("Sleeping ");
-      display.print(sleeptimeSecs);
-      display.print("s for initial cooldown...");
-       display.display(true);
-      gotosleep();
-    }*/
             
   if (firstrun >= 100) {display.clearScreen();
    if (page == 2){
@@ -826,7 +808,7 @@ void setup()
       page = 3;
       doHumDisplay();
       break;
-    case 4: 
+    case 0: 
       page = 4;
       doBatDisplay();
       break;
