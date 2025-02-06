@@ -14,10 +14,16 @@ Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 sensors_event_t humidity, temp;
 #include<Wire.h>
+#include<ADS1115_WE.h> 
+#include<Wire.h>
 #define I2C_ADDRESS 0x48
+
 #include "driver/periph_ctrl.h"
 int GPIO_reason;
 #include "esp_sleep.h"
+
+
+ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 
 const char* ssid = "mikesnet";
 const char* password = "springchicken";
@@ -88,7 +94,7 @@ float findLowestNonZero(float a, float b, float c) {
 }
 
 void gotosleep() {
-      WiFi.disconnect();
+      //WiFi.disconnect();
       display.hibernate();
       SPI.end();
       Wire.end();
@@ -720,11 +726,23 @@ void updateMain() {
 }
 
 
+float readChannel(ADS1115_MUX channel) {
+  float voltage = 0.0;
+  adc.setCompareChannels(channel);
+  adc.startSingleMeasurement();
+  while(adc.isBusy()){delay(0);}
+  voltage = adc.getResult_V(); // alternative: getResult_mV for Millivolt
+  return voltage;
+}
+
 void setup()
 {
-  vBat = analogReadMilliVolts(0) / 500.0;
-  GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
   Wire.begin();  
+  adc.init();
+  adc.setVoltageRange_mV(ADS1115_RANGE_4096); 
+  vBat = readChannel(ADS1115_COMP_0_GND) * 2.0;
+  GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
+  
 
   aht.begin();
   bmp.begin();
@@ -745,7 +763,7 @@ void setup()
   delay(50);
 
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
-  display.setRotation(3);
+  display.setRotation(2);
   display.setTextSize(1);
   pinMode(0, INPUT_PULLUP);
   pinMode(1, INPUT_PULLUP);
@@ -799,22 +817,22 @@ void setup()
       page = 1;
       doTempDisplay();
       break;
-    case 2: 
+    case 3: 
       page = 2;
         wipeScreen();
         doWindDisplay();
       break;
-    case 3: 
+    case 2: 
       page = 3;
       doHumDisplay();
       break;
-    case 0: 
+    case 5: 
       page = 4;
       doBatDisplay();
       break;
-    case 5: 
+    case 0: 
     delay(50);
-      while (!digitalRead(5))
+      while (!digitalRead(0))
         {
           delay(10);
           if (millis() > 2000) {
@@ -850,7 +868,7 @@ void setup()
 void loop()
 {
 ArduinoOTA.handle();
-if (!digitalRead(5)) {gotosleep();}
+if (!digitalRead(0)) {gotosleep();}
 delay(250);
     // Add a delay to sample data at intervals (e.g., every minute)
     //delay(1000); // 1 minute delay, adjust as needed
