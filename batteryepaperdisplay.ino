@@ -202,17 +202,17 @@ void startWifi(){
      //  display.display(true);
        delay(500);}
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-            Blynk.virtualWrite(V91, t);
+            Blynk.virtualWrite(V111, t);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V92, h);
+          Blynk.virtualWrite(V112, h);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V93, pres);
+          Blynk.virtualWrite(V113, pres);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V94, abshum);
+          Blynk.virtualWrite(V114, abshum);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V95, vBat);
+          Blynk.virtualWrite(V115, vBat);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V95, vBat);
+          Blynk.virtualWrite(V115, vBat);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
     struct tm timeinfo;
     getLocalTime(&timeinfo);
