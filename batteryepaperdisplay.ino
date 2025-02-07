@@ -21,6 +21,13 @@ sensors_event_t humidity, temp;
 #include "driver/periph_ctrl.h"
 int GPIO_reason;
 #include "esp_sleep.h"
+#include <Fonts/Roboto_Condensed_12.h>
+//#include <Fonts/FreeSans12pt7b.h> 
+#include <Fonts/Open_Sans_Condensed_Bold_48.h> 
+
+#define FONT1  //&Roboto_Condensed_12
+#define FONT2 &Open_Sans_Condensed_Bold_48
+
 
 
 ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
@@ -54,13 +61,13 @@ float abshum;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 
-#include "bitmaps/Bitmaps128x250.h"
-#include <Fonts/FreeMonoBold9pt7b.h>
-#include <Fonts/Roboto_Condensed_12.h>
-#include <Fonts/FreeSerif12pt7b.h> 
-#include <Fonts/Open_Sans_Condensed_Bold_54.h> 
-#include <Fonts/DejaVu_Serif_Condensed_36.h>
-#include <Fonts/DejaVu_Serif_Condensed_60.h>
+//#include "bitmaps/Bitmaps128x250.h"
+//#include <Fonts/FreeMonoBold9pt7b.h>
+//#include <Fonts/Roboto_Condensed_12.h>
+//#include <Fonts/FreeSerif12pt7b.h> 
+//#include <Fonts/Open_Sans_Condensed_Bold_54.h> 
+//#include <Fonts/DejaVu_Serif_Condensed_36.h>
+//#include <Fonts/DejaVu_Serif_Condensed_60.h>
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 //GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
@@ -160,30 +167,28 @@ BLYNK_WRITE(V82) {
 
 void startWifi(){
 
-  //display.clearScreen();
-  //display.setPartialWindow(0, 0, display.width(), display.height());
-  //display.setCursor(0, 0);
-  //display.firstPage();
+  display.setPartialWindow(0, 0, display.width(), display.height());
+  display.setCursor(0, 0);
+  display.firstPage();
 
-  //do {
-  //  display.print("Connecting...");
-  //} while (display.nextPage());
+  do {
+    display.print("Connecting...");
+  } while (display.nextPage());
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);  
   WiFi.setTxPower (WIFI_POWER_8_5dBm);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 10000) { //display.print("!");
-      WiFi.setTxPower(WIFI_POWER_8_5dBm);
-    }
-    if (millis() > 20000) {
-        return;
-      }
+    if (millis() > 10000) { display.print("!");}
+    if ((millis() > 20000)) {break;}
     //do {
-      //display.print(".");
-      // display.display(true);
+      display.print(".");
+       display.display(true);
     //} while (display.nextPage());
+    delay(1000);
   }
+  
+  
   //wipeScreen();
   //display.setCursor(0, 0);
   //display.firstPage();
@@ -235,6 +240,7 @@ void startWifi(){
 void startWebserver(){
 
   //display.clearScreen();
+  display.setFont();
   display.setPartialWindow(0, 0, display.width(), display.height());
   display.setCursor(0, 0);
   display.firstPage();
@@ -247,7 +253,7 @@ void startWebserver(){
   WiFi.setTxPower (WIFI_POWER_8_5dBm);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 20000) { display.print("!");}
+    if (millis() > 20000) { display.print("!"); }
     if ((millis() > 30000)) {gotosleep();}
     //do {
       display.print(".");
@@ -292,23 +298,27 @@ void wipeScreen(){
 }
 
 void setupChart() {
+  display.setTextSize(1);
+  display.setFont();
     display.setCursor(0, 0);
     display.print("<");
     display.print(maxVal, 3);
     
     // Adjusted for bottom of 200x200 display
-    display.setCursor(0, 199);
+    display.setCursor(0, 193);
     display.print("<");
     display.print(minVal, 3);
 
     // Adjusted for horizontal placement of the additional text
-    display.setCursor(160, 199);
+    display.setCursor(100, 193);
     display.print("<#");
     display.print(readingCount - 1, 0);
     display.print("*");
     display.print(sleeptimeSecs, 0);
     display.print("s>");
-
+    int barx = mapf(vBat, 3.3, 4.15, 0, 19); // Map battery value to progress bar width
+    if (barx > 19) { barx = 19; }
+    if (barx < 0) { barx = 0; }
     // Adjusted rectangle and progress bar to fit within bounds
     display.drawRect(179, 192, 19, 7, GxEPD_BLACK); // Rectangle moved to fit fully within 200x200
     display.fillRect(179, 192, barx, 7, GxEPD_BLACK); // Progress bar inside the rectangle
@@ -318,7 +328,7 @@ void setupChart() {
     display.drawLine(199, 193, 199, 198, GxEPD_BLACK);
 
     // Set the cursor for additional chart decorations
-    display.setCursor(125, 0); 
+    display.setCursor(80, 0); 
 }
 
 
@@ -485,7 +495,9 @@ void doPresDisplay() {
 
 
 void doBatDisplay() {
+    display.setFont();
     // Recalculate min and max values
+    display.setTextSize(1);
     minVal = array4[maxArray - readingCount];
     maxVal = array4[maxArray - readingCount];
 
@@ -532,7 +544,7 @@ void doBatDisplay() {
         display.setCursor(175, 193); // Adjusted for new width
 
         int batPct = mapf(vBat, 3.3, 4.15, 0, 100);
-        display.setCursor(125, 0); // Same placement
+        display.setCursor(80, 0); // Same placement
         display.print("[vBat: ");
         display.print(vBat, 3);
         display.print("v/");
@@ -665,52 +677,65 @@ void updateMain() {
     display.setFullWindow();
     display.fillScreen(GxEPD_WHITE);
 
+
     // Draw crosshair lines to divide the screen into 4 quadrants
     display.drawLine(99, 0, 99, 200, GxEPD_BLACK);  // Vertical center line
     display.drawLine(100, 0, 100, 200, GxEPD_BLACK); // Vertical center line (thicker)
     display.drawLine(0, 99, 200, 99, GxEPD_BLACK);  // Horizontal center line
     display.drawLine(0, 100, 200, 100, GxEPD_BLACK); // Horizontal center line (thicker)
-
+    int height1 = 60;
+    int width2 = 118;
+    int height2 = 160;
     // Quadrant 1: Top-left
-    display.setTextSize(1); // Font size 2 (16px)
+    display.setFont(FONT1); // Font size 2 (16px)
     display.setCursor(24, 2); // Adjusted to fit top-left quadrant
-    display.print("Temp:");
-    display.setCursor(6, 40); // Centered vertically in quadrant
-    display.setTextSize(2); // Font size 3 (24px)
+    display.print("Temp");
     float temptodraw = array3[(maxArray - 1)];
+    if (temptodraw > -10) {display.setCursor(8, height1);}
+    else {display.setCursor(2, height1);} // Centered vertically in quadrant
+    display.setFont(FONT2); // Font size 3 (24px)
+    
     if ((temptodraw > 0) && (temptodraw < 10)) { display.print(" "); }
     display.print(temptodraw, 1);
-    display.print("c");
+    if (temptodraw > -10) {
+      display.setFont();
+      display.print(char(247));
+      display.print("c");
+    }
 
     // Quadrant 2: Top-right
-    display.setTextSize(1); // Font size 2 (16px)
+    display.setFont(FONT1); // Font size 2 (16px)
     display.setCursor(124, 2); // Adjusted to fit top-right quadrant
-    display.print("Wind:");
-    display.setCursor(130, 40); // Centered vertically in quadrant
-    display.setTextSize(2); // Font size 3 (24px)
+    display.print("Wind");
+    display.setCursor(width2, height1); // Centered vertically in quadrant
+    display.setFont(FONT2); // Font size 3 (24px)
     display.print(windspeed, 0);
+    display.setFont();
     display.print("kph");
 
     // Quadrant 3: Bottom-left
-    display.setTextSize(1); // Font size 2 (16px)
+    display.setFont(FONT1); // Font size 2 (16px)
     display.setCursor(24, 104); // Adjusted for bottom-left quadrant
-    display.print("Fridge:");
-    display.setCursor(20, 140); // Centered vertically in quadrant
-    display.setTextSize(2); // Font size 3 (24px)
+    display.print("Fridge");
+    display.setCursor(15, height2); // Centered vertically in quadrant
+    display.setFont(FONT2); // Font size 3 (24px)
     display.print(fridgetemp, 1);
+    display.setFont();
+    display.print(char(247));
     display.print("c");
 
     // Quadrant 4: Bottom-right
-    display.setTextSize(1); // Font size 2 (16px)
+    display.setFont(FONT1); // Font size 2 (16px)
     display.setCursor(124, 104); // Adjusted for bottom-right quadrant
-    display.print("Gust:");
-    display.setCursor(130, 140); // Centered vertically in quadrant
-    display.setTextSize(2); // Font size 3 (24px)
+    display.print("Gust");
+    display.setCursor(width2, height2); // Centered vertically in quadrant
+    display.setFont(FONT2); // Font size 3 (24px)
     display.print(windgust, 0);
+    display.setFont();
     display.print("kph");
 
     // Display time string near the bottom-left corner
-    display.setTextSize(1); // Font size 1 (8px)
+    display.setFont(); // Font size 1 (8px)
     display.setCursor(0, 192); // 8px above the bottom
     display.print(timeString);
 
@@ -721,7 +746,7 @@ void updateMain() {
     display.fillRect(179, 192, barx, 7, GxEPD_BLACK); // Battery fill
     display.drawLine(198, 193, 198, 198, GxEPD_BLACK); // Tick marks on battery
     display.drawLine(199, 193, 199, 198, GxEPD_BLACK); // Tick marks on battery
-    display.drawRect(0,0, display.width(), display.height(), GxEPD_BLACK);
+    //display.drawRect(0,0, display.width(), display.height(), GxEPD_BLACK);
     display.display(true);
 }
 
@@ -764,7 +789,7 @@ void setup()
 
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(2);
-  display.setTextSize(1);
+  display.setFont();
   pinMode(0, INPUT_PULLUP);
   pinMode(1, INPUT_PULLUP);
   pinMode(2, INPUT_PULLUP);
@@ -819,7 +844,7 @@ void setup()
       break;
     case 3: 
       page = 2;
-        wipeScreen();
+        //wipeScreen();
         doWindDisplay();
       break;
     case 2: 
