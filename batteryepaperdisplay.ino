@@ -103,13 +103,13 @@ float findLowestNonZero(float a, float b, float c) {
 void gotosleep() {
       //WiFi.disconnect();
       display.hibernate();
-      SPI.end();
+      //SPI.end();
       Wire.end();
-      pinMode(SS, INPUT_PULLUP );
-      pinMode(6, INPUT_PULLUP );
-      pinMode(4, INPUT_PULLUP );
-      pinMode(8, INPUT_PULLUP );
-      pinMode(9, INPUT_PULLUP );
+      pinMode(SS, INPUT );
+      pinMode(6, INPUT );
+      pinMode(4, INPUT );
+      pinMode(8, INPUT );
+      pinMode(9, INPUT );
       pinMode(1, INPUT_PULLUP );
       pinMode(2, INPUT_PULLUP );
       pinMode(3, INPUT_PULLUP );
