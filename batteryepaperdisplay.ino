@@ -33,11 +33,12 @@ int GPIO_reason;
 ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 
 const char* ssid = "mikesnet";
+bool isSetNtp = false;  
 const char* password = "springchicken";
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 1
-
+#define TIME_TIMEOUT 20000
 #define sleeptimeSecs 300
 #define maxArray 501
 
@@ -101,7 +102,7 @@ float findLowestNonZero(float a, float b, float c) {
 }
 
 void gotosleep() {
-      //WiFi.disconnect();
+      WiFi.disconnect();
       display.hibernate();
       //SPI.end();
       Wire.end();
@@ -165,6 +166,19 @@ BLYNK_WRITE(V82) {
   fridgetemp = param.asFloat();
 }
 
+void initTime(String timezone){
+  configTzTime(timezone.c_str(), "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
+
+  /*while ((!isSetNtp) && (millis() < TIME_TIMEOUT)) {
+        delay(1000);
+        display.print("@");
+        display.display(true);
+        }*/
+
+}
+
+
+
 void startWifi(){
 
   display.setPartialWindow(0, 0, display.width(), display.height());
@@ -188,18 +202,15 @@ void startWifi(){
     delay(1000);
   }
   
-  
-  //wipeScreen();
-  //display.setCursor(0, 0);
-  //display.firstPage();
-  //do {
-    //display.print("Connected! to: ");
-    //display.println(WiFi.localIP());
-  //} while (display.nextPage());
-   // display.print("RSSI: ");
-  //  display.println(WiFi.RSSI());
-  // display.display(true);
-  // display.print("Connecting to blynk...");
+  if (WiFi.status() == WL_CONNECTED) {
+    display.print("Connected. Getting time...");
+  }
+  else
+  {
+    display.print("Connection timed out. :(");
+  }
+  display.display(true);
+  initTime("EST5EDT,M3.2.0,M11.1.0");
   Blynk.config(bedroomauth, IPAddress(192, 168, 50, 197), 8080);
   Blynk.connect();
   while ((!Blynk.connected()) && (millis() < 20000)){
@@ -760,6 +771,8 @@ float readChannel(ADS1115_MUX channel) {
   return voltage;
 }
 
+
+
 void setup()
 {
   Wire.begin();  
@@ -784,8 +797,7 @@ void setup()
    pres = bmp.readPressure() / 100.0;
     abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
 
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  delay(50);
+
 
   display.init(115200, false, 10, false); // void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 10, bool pulldown_rst_mode = false)
   display.setRotation(2);
