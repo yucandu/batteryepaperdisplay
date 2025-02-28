@@ -22,10 +22,9 @@ sensors_event_t humidity, temp;
 int GPIO_reason;
 #include "esp_sleep.h"
 #include <Fonts/Roboto_Condensed_12.h>
-//#include <Fonts/FreeSans12pt7b.h> 
 #include <Fonts/Open_Sans_Condensed_Bold_48.h> 
 
-#define FONT1  //&Roboto_Condensed_12
+#define FONT1  
 #define FONT2 &Open_Sans_Condensed_Bold_48
 
 
@@ -35,8 +34,7 @@ ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 const char* ssid = "mikesnet";
 bool isSetNtp = false;  
 const char* password = "springchicken";
-// base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
-// enable GxEPD2_GFX base class
+
 #define ENABLE_GxEPD2_GFX 1
 #define TIME_TIMEOUT 20000
 #define sleeptimeSecs 300
@@ -62,22 +60,14 @@ float abshum;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 
-//#include "bitmaps/Bitmaps128x250.h"
-//#include <Fonts/FreeMonoBold9pt7b.h>
-//#include <Fonts/Roboto_Condensed_12.h>
-//#include <Fonts/FreeSerif12pt7b.h> 
-//#include <Fonts/Open_Sans_Condensed_Bold_54.h> 
-//#include <Fonts/DejaVu_Serif_Condensed_36.h>
-//#include <Fonts/DejaVu_Serif_Condensed_60.h>
+
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
-//GxEPD2_BW<GxEPD2_213_BN, GxEPD2_213_BN::HEIGHT> display(GxEPD2_213_BN(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 3)); // DEPG0213BN 122x250, SSD1680
+
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
 
 const char* blynkserver = "192.168.50.197:9443";
 const char* bedroomauth = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";  //hubert
-//const char* fridgeauth = "VnFlJdW3V0uZQaqslqPJi6WPA9LaG1Pk";
 
-// Virtual Pins
 const char* v41_pin = "V41";
 const char* v62_pin = "V62";
 
@@ -118,17 +108,9 @@ void gotosleep() {
       pinMode(5, INPUT_PULLUP );
 
 
-      //delay(10000);
-      //rtc_gpio_isolate(gpio_num_t(SDA));
-      //rtc_gpio_isolate(gpio_num_t(SCL));
-      //periph_module_disable(PERIPH_I2C0_MODULE);  
-      //digitalWrite(SDA, 0);
-      //digitalWrite(SCL, 0);
+
       uint64_t bitmask = BUTTON_PIN_BITMASK(GPIO_NUM_1) | BUTTON_PIN_BITMASK(GPIO_NUM_2) | BUTTON_PIN_BITMASK(GPIO_NUM_3) | BUTTON_PIN_BITMASK(GPIO_NUM_0) | BUTTON_PIN_BITMASK(GPIO_NUM_5);
-   //   esp_deep_sleep_enable_gpio_wakeup(1 << 0, ESP_GPIO_WAKEUP_GPIO_LOW);
-    //  esp_deep_sleep_enable_gpio_wakeup(1 << 1, ESP_GPIO_WAKEUP_GPIO_LOW);
-   //   esp_deep_sleep_enable_gpio_wakeup(1 << 2, ESP_GPIO_WAKEUP_GPIO_LOW);
-   //   esp_deep_sleep_enable_gpio_wakeup(1 << 3, ESP_GPIO_WAKEUP_GPIO_LOW);
+
       esp_deep_sleep_enable_gpio_wakeup(bitmask, ESP_GPIO_WAKEUP_GPIO_LOW);
       esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000ULL);
       delay(1);
@@ -169,11 +151,7 @@ BLYNK_WRITE(V82) {
 void initTime(String timezone){
   configTzTime(timezone.c_str(), "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
 
-  /*while ((!isSetNtp) && (millis() < TIME_TIMEOUT)) {
-        delay(1000);
-        display.print("@");
-        display.display(true);
-        }*/
+
 
 }
 
@@ -228,8 +206,23 @@ void startWifi(){
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
           Blynk.virtualWrite(V115, vBat);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V115, vBat);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          if (readingCount > 2) {  // Need at least 3 readings
+            int startIdx = 2;  // Skip first two readings
+            float firstBat = array4[startIdx];
+            float lastBat = array4[readingCount-1];
+            float voltDiff = lastBat - firstBat;
+            
+            // Calculate hours between these points (5 min per reading)
+            float hours = ((readingCount - startIdx) * 5.0) / 60.0;  // Only count hours after startIdx
+            
+            float dailyDrain = (-voltDiff / hours) * 24.0;
+            Blynk.virtualWrite(V116, dailyDrain);
+            Blynk.run();
+          }
+          Blynk.virtualWrite(V117, WiFi.RSSI());
+          Blynk.run();
+          Blynk.virtualWrite(V117, WiFi.RSSI());
+          Blynk.run();
     struct tm timeinfo;
     getLocalTime(&timeinfo);
     time_t now = time(NULL);
@@ -238,14 +231,7 @@ void startWifi(){
   // Allocate a char array for the time string
   char timeString[10]; // "12:34 PM" is 8 chars + null terminator
 
-  // Format the time string
- /* if (timeinfo.tm_min < 10) {
-    snprintf(timeString, sizeof(timeString), "%d:0%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  } else {
-    snprintf(timeString, sizeof(timeString), "%d:%d %s", timeinfo.tm_hour % 12 == 0 ? 12 : timeinfo.tm_hour % 12, timeinfo.tm_min, timeinfo.tm_hour < 12 ? "AM" : "PM");
-  }
-    display.println(timeString);
-    display.display(true);*/
+
 }
 
 void startWebserver(){
@@ -304,7 +290,6 @@ void wipeScreen(){
     } while (display.nextPage());
     display.firstPage();
 
-    //readingTime = ((readingCount - 1) * sleeptimeSecs) / 60;
 
 }
 
@@ -448,13 +433,7 @@ void doHumDisplay() {
 }
 
 void doWindDisplay() {
-
-
-
-
-        
- wipeScreen();
-
+  wipeScreen();
   updateMain();
   gotosleep();
 }
@@ -907,6 +886,5 @@ void loop()
 ArduinoOTA.handle();
 if (!digitalRead(0)) {gotosleep();}
 delay(250);
-    // Add a delay to sample data at intervals (e.g., every minute)
-    //delay(1000); // 1 minute delay, adjust as needed
+
 }
