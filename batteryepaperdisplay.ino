@@ -757,7 +757,7 @@ void setup()
   Wire.begin();  
   adc.init();
   adc.setVoltageRange_mV(ADS1115_RANGE_4096); 
-  vBat = analogReadMilliVolts(0) / 500.0;
+  vBat = readChannel(ADS1115_COMP_0_GND) * 2.0;
   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
   
 
