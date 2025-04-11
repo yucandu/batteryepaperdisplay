@@ -59,7 +59,7 @@ float abshum;
  float maxVal = 4.2;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
-
+bool buttonstart = false;
 
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 
@@ -126,6 +126,7 @@ BLYNK_CONNECTED() {
   Blynk.syncVirtual(V78);
   Blynk.syncVirtual(V79);
   Blynk.syncVirtual(V82);
+  Blynk.syncVirtual(V120); //flash button
 }
 
 BLYNK_WRITE(V41) {
@@ -146,6 +147,12 @@ BLYNK_WRITE(V79) {
 }
 BLYNK_WRITE(V82) {
   fridgetemp = param.asFloat();
+}
+
+BLYNK_WRITE(V120)
+{
+  if (param.asInt() == 1) {buttonstart = true;}
+  if (param.asInt() == 0) {buttonstart = false;}
 }
 
 void initTime(String timezone){
@@ -205,20 +212,36 @@ void startWifi(){
           Blynk.virtualWrite(V114, abshum);
           if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
           Blynk.virtualWrite(V115, vBat);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          if (readingCount > 2) {  // Need at least 3 readings
-            int startIdx = 2;  // Skip first two readings
-            float firstBat = array4[startIdx];
-            float lastBat = array4[readingCount-1];
-            float voltDiff = lastBat - firstBat;
-            
-            // Calculate hours between these points (5 min per reading)
-            float hours = ((readingCount - startIdx) * 5.0) / 60.0;  // Only count hours after startIdx
-            
-            float dailyDrain = (-voltDiff / hours) * 24.0;
-            Blynk.virtualWrite(V116, dailyDrain);
-            Blynk.run();
-          }
+          Blynk.run();
+            if (readingCount > 2) {
+              float currentVoltage = vBat;
+              int increases = 0;
+              int index = maxArray - 1;
+              float referenceVoltage = 0;
+              
+              // Search backwards through array for second voltage increase
+              while (index >= maxArray - readingCount && increases < 2) {
+                  if (array4[index] > currentVoltage + 0.0005) { // Small threshold to account for noise
+                      increases++;
+                      if (increases == 2) {
+                          referenceVoltage = array4[index];
+                          break;
+                      }
+                  }
+                  currentVoltage = array4[index];
+                  index--;
+              }
+              
+              if (increases == 2) {
+                  // Calculate time span between points (5 min per reading)
+                  double hours = ((maxArray - 1 - index) * 5.0) / 60.0;
+                  
+                  // Calculate daily drain rate in millivolts (negative indicates drain)
+                  double dailyDrain = ((vBat - referenceVoltage) * 1000.0 / hours) * 24.0;
+                  Blynk.virtualWrite(V116, dailyDrain);
+                  Blynk.run();
+              }
+            }
           Blynk.virtualWrite(V117, WiFi.RSSI());
           Blynk.run();
           Blynk.virtualWrite(V117, WiFi.RSSI());
@@ -588,29 +611,6 @@ void takeSamples(){
           Blynk.syncVirtual(V79);
           Blynk.syncVirtual(V82);
 
-          /*display.print("North temp: ");
-          display.println(v41_value);
-          //display.display(true);
-          //float v62_value = fetchBlynkValue("V62", bedroomauth);
-          display.print("Neo temp: ");
-          display.println(v62_value);
-          display.print("Joju temp: ");
-          display.println(v42_value);
-          //display.display(true);
-          //windspeed = fetchBlynkValue("V78", bedroomauth);
-          display.print("Wind speed: ");
-          display.println(windspeed);
-          //display.display(true);
-          //windgust = fetchBlynkValue("V79", bedroomauth);
-          display.print("Wind gust: ");
-          display.println(windgust);
-          //display.display(true);
-          //fridgetemp = fetchBlynkValue("V1", fridgeauth);
-          display.print("Fridge temp: ");
-          display.println(fridgetemp);
-          display.print("Time: ");
-          display.print(millis());
-          display.display(true);*/
           float min_value = findLowestNonZero(v41_value, v42_value, v62_value);
 
 
@@ -757,7 +757,7 @@ void setup()
   Wire.begin();  
   adc.init();
   adc.setVoltageRange_mV(ADS1115_RANGE_4096); 
-  vBat = readChannel(ADS1115_COMP_0_GND) * 2.0;
+  vBat = analogReadMilliVolts(0) / 500.0;
   GPIO_reason = log(esp_sleep_get_gpio_wakeup_status())/log(2);
   
 
@@ -809,6 +809,7 @@ void setup()
 
   if (GPIO_reason < 0) {
     startWifi();
+    if (buttonstart) {startWebserver(); return;}
     takeSamples();
       switch (page){
         case 0: 
