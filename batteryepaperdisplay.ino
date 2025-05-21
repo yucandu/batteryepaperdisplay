@@ -38,7 +38,7 @@ const char* password = "springchicken";
 #define ENABLE_GxEPD2_GFX 1
 #define TIME_TIMEOUT 20000
 #define sleeptimeSecs 300
-#define maxArray 501
+#define maxArray 401
 
 
 RTC_DATA_ATTR float array1[maxArray];
@@ -46,9 +46,7 @@ RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
 RTC_DATA_ATTR float windspeed, windgust, fridgetemp, outtemp;
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
-const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
+
   float t, h, pres, barx;
   float v41_value, v42_value, v62_value;
 
@@ -90,6 +88,27 @@ float findLowestNonZero(float a, float b, float c) {
 
   return minimum;
 }
+
+void drawCenteredText(const char* text, int x, int y, int w, int h) {
+    int16_t tbx, tby;
+    uint16_t tbw, tbh;
+    display.getTextBounds(text, x, y, &tbx, &tby, &tbw, &tbh);
+    int cx = x + (w - tbw) / 2 - tbx;
+    int cy = y + (h - tbh) / 2 - tby;
+    display.setCursor(cx, cy);
+    display.print(text);
+}
+
+// Helper: center a float value with units in a rectangle
+void drawCenteredValue(float value, int decimals, const char* units, int x, int y, int w, int h, bool showDegree = false) {
+    char buf[16];
+    dtostrf(value, 0, decimals, buf);
+    String s = String(buf);
+    if (showDegree) s += String(char(247));
+    if (units) s += units;
+    drawCenteredText(s.c_str(), x, y, w, h);
+}
+
 
 void gotosleep() {
       WiFi.disconnect();
@@ -156,45 +175,66 @@ BLYNK_WRITE(V120)
 }
 
 void initTime(String timezone){
-  configTzTime(timezone.c_str(), "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
+  configTzTime(timezone.c_str(), "192.168.50.197");
 
 
 
 }
 
+float calculateBatteryDrainRate(int N) {
+    if (readingCount < N) N = readingCount;
+    if (N < 2) return 0;
 
+    // Each reading is 5 minutes apart
+    float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    int startIdx = maxArray - N;
+    for (int i = 0; i < N; i++) {
+        float x = i * 5.0 / 60.0; // hours since oldest reading
+        float y = array4[startIdx + i];
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumXX += x * x;
+    }
+    float slope = (N * sumXY - sumX * sumY) / (N * sumXX - sumX * sumX); // V/hour
+    float drainPerDay = slope * 1000.0 * 24.0; // mV per day
+    return drainPerDay;
+}
 
 void startWifi(){
 
-  display.setPartialWindow(0, 0, display.width(), display.height());
-  display.setCursor(0, 0);
-  display.firstPage();
 
-  do {
-    display.print("Connecting...");
-  } while (display.nextPage());
+
+  //do {
+  //  display.print("Connecting...");
+  //} while (display.nextPage());
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);  
   WiFi.setTxPower (WIFI_POWER_8_5dBm);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() > 10000) { display.print("!");}
+    //if (millis() > 10000) { display.print("!");}
     if ((millis() > 20000)) {break;}
     //do {
-      display.print(".");
-       display.display(true);
+    //  display.print(".");
+    //   display.display(true);
     //} while (display.nextPage());
     delay(1000);
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    display.print("Connected. Getting time...");
+    //display.print("Connected. Getting time...");
   }
   else
   {
+    display.setPartialWindow(0, 0, display.width(), display.height());
+    display.setCursor(0, 0);
+    display.firstPage();
+    wipeScreen();
     display.print("Connection timed out. :(");
+    display.display(true);
   }
-  display.display(true);
+  
   initTime("EST5EDT,M3.2.0,M11.1.0");
   Blynk.config(bedroomauth, IPAddress(192, 168, 50, 197), 8080);
   Blynk.connect();
@@ -203,49 +243,41 @@ void startWifi(){
      //  display.display(true);
        delay(500);}
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-            Blynk.virtualWrite(V111, t);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V112, h);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V113, pres);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V114, abshum);
-          if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-          Blynk.virtualWrite(V115, vBat);
-          Blynk.run();
+    Blynk.virtualWrite(V111, t);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V112, h);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V113, pres);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V114, abshum);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V115, vBat);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V115, vBat);
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V117, WiFi.RSSI());
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+  Blynk.virtualWrite(V117, WiFi.RSSI());
+  if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
             if (readingCount > 2) {
-              float currentVoltage = vBat;
-              int increases = 0;
-              int index = maxArray - 1;
-              float referenceVoltage = 0;
-              
-              // Search backwards through array for second voltage increase
-              while (index >= maxArray - readingCount && increases < 2) {
-                  if (array4[index] > currentVoltage + 0.0005) { // Small threshold to account for noise
-                      increases++;
-                      if (increases == 2) {
-                          referenceVoltage = array4[index];
-                          break;
-                      }
-                  }
-                  currentVoltage = array4[index];
-                  index--;
+              float dailyDrain;
+              if (readingCount > 12) {
+                dailyDrain = calculateBatteryDrainRate(12); // Use last 12 readings (1 hour)
+                Blynk.virtualWrite(V116, dailyDrain);
+                Blynk.run();
               }
-              
-              if (increases == 2) {
-                  // Calculate time span between points (5 min per reading)
-                  double hours = ((maxArray - 1 - index) * 5.0) / 60.0;
-                  
-                  // Calculate daily drain rate in millivolts (negative indicates drain)
-                  double dailyDrain = ((vBat - referenceVoltage) * 1000.0 / hours) * 24.0;
-                  Blynk.virtualWrite(V116, dailyDrain);
-                  Blynk.run();
+              else
+              {
+                dailyDrain = calculateBatteryDrainRate(readingCount); // Use all readings
+                Blynk.virtualWrite(V116, dailyDrain);
+                Blynk.run();
               }
+              Blynk.virtualWrite(V116, dailyDrain);
+              Blynk.run();
+              Blynk.virtualWrite(V116, dailyDrain);
+              Blynk.run();
             }
-          Blynk.virtualWrite(V117, WiFi.RSSI());
-          Blynk.run();
-          Blynk.virtualWrite(V117, WiFi.RSSI());
-          Blynk.run();
+
     struct tm timeinfo;
     getLocalTime(&timeinfo);
     time_t now = time(NULL);
@@ -300,7 +332,7 @@ void startWebserver(){
 
 void wipeScreen(){
 
-    display.setPartialWindow(0, 0, display.width(), display.height());
+    /*display.setPartialWindow(0, 0, display.width(), display.height());
 
     display.firstPage();
     do {
@@ -311,7 +343,9 @@ void wipeScreen(){
     do {
       display.fillRect(0,0,display.width(),display.height(),GxEPD_WHITE);
     } while (display.nextPage());
-    display.firstPage();
+    display.firstPage();*/
+
+    display.fillScreen(GxEPD_WHITE);
 
 
 }
@@ -740,6 +774,8 @@ void updateMain() {
     display.display(true);
 }
 
+// Helper: center text in a rectangle (x, y, w, h)
+
 
 float readChannel(ADS1115_MUX channel) {
   float voltage = 0.0;
@@ -887,5 +923,4 @@ void loop()
 ArduinoOTA.handle();
 if (!digitalRead(0)) {gotosleep();}
 delay(250);
-
 }
