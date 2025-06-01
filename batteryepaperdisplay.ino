@@ -650,10 +650,13 @@ void takeSamples(){
 
 
 
-
           //display.display(true);
 
           if (min_value != 999) {
+              Blynk.virtualWrite(V118, min_value);
+              if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+              Blynk.virtualWrite(V118, min_value);
+              if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
             for (int i = 0; i < (maxArray - 1); i++) {
                 array3[i] = array3[i + 1];
             }
