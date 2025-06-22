@@ -24,6 +24,17 @@ int GPIO_reason;
 #include <Fonts/Roboto_Condensed_12.h>
 #include <Fonts/Open_Sans_Condensed_Bold_48.h> 
 
+#include <esp_now.h>
+//#include <WiFi.h>
+#include <esp_wifi.h>
+
+// ==================== CONFIGURATION ====================
+#define DEVICE_ID 1001                    // Unique ID for this device (change for each C3)
+#define TWO_WAY_COMM true                 // Set to false for broadcast-only mode
+#define TRANSMISSION_INTERVAL 30000       // Send data every 30 seconds
+#define MAX_RETRIES 3                     // Only used in two-way mode
+#define ACK_TIMEOUT 1000                  // Timeout for ACK in two-way mode (ms)
+
 #define FONT1  
 #define FONT2 &Open_Sans_Condensed_Bold_48
 
@@ -58,7 +69,7 @@ float abshum;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 bool buttonstart = false;
-
+unsigned long localUnixtime = 0;
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
@@ -70,6 +81,117 @@ const char* v41_pin = "V41";
 const char* v62_pin = "V62";
 
 float vBat;
+
+// ==================== DATA STRUCTURES ====================
+typedef struct {
+  uint16_t device_id;
+  float sensor_data[7];  // Array for up to 7 sensor values
+  bool request_response; // True if device wants a response
+  uint32_t timestamp;    // For debugging/tracking
+} sensor_message_t;
+
+typedef struct {
+  uint16_t target_device_id;
+  float response_data[7]; // Array for response data
+  uint32_t timestamp;
+} response_message_t;
+
+// ==================== GLOBAL VARIABLES ====================
+uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Broadcast to all
+esp_now_peer_info_t peerInfo;
+bool waiting_for_response = false;
+unsigned long response_timeout = 0;
+unsigned long last_transmission = 0;
+
+// ==================== SENSOR DATA FUNCTIONS ====================
+void collectSensorData(float* data) {
+      data[0] = t;  // Temperature
+      data[1] = h;  // Humidity
+      data[2] = pres; // Pressure
+      data[3] = vBat;   // Battery voltage
+      data[4] = abshum;   // Absolute humidity
+      data[5] = 0.0;   // Unused
+      data[6] = 0.0;   // Unused
+}
+
+void processResponseData(float* data) {
+    if(data[0] != 0.0) {
+      localUnixtime = (unsigned long)data[0]; // Assuming first element is a timestamp
+      fridgetemp = data[1]; // Assuming second element is fridge temperature
+      outtemp = data[2]; // Assuming third element is outdoor temperature
+      windspeed = data[3]; // Assuming fourth element is wind speed
+      windgust = data[4]; // Assuming fifth element is wind gust
+      struct timeval tv;
+      tv.tv_sec = localUnixtime;
+      tv.tv_usec = 0;
+      settimeofday(&tv, NULL);
+      setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+      tzset();
+    }
+}
+
+void sendSensorData() {
+  sensor_message_t message;
+  message.device_id = DEVICE_ID;
+  message.request_response = TWO_WAY_COMM;
+  message.timestamp = millis();
+  
+  // Collect sensor data
+  collectSensorData(message.sensor_data);
+  
+  // Send the message 
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message, sizeof(message));
+  
+  if (result == ESP_OK) {
+    Serial.printf("Sending data from device %d...\n", DEVICE_ID);
+    
+    // Print sensor data being sent
+    Serial.println("Sensor data:");
+    for(int i = 0; i < 7; i++) {
+      if(message.sensor_data[i] != 0.0) {
+        Serial.printf("  Sensor[%d]: %.2f\n", i, message.sensor_data[i]);
+      }
+    }
+  } else {
+    Serial.println("Error sending the data");
+  }
+}
+
+
+// ==================== ESP-NOW CALLBACKS ====================
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  if(TWO_WAY_COMM) {
+    if(status == ESP_NOW_SEND_SUCCESS) {
+      Serial.println("Data sent successfully, waiting for response...");
+      waiting_for_response = true;
+      response_timeout = millis() + ACK_TIMEOUT;
+    } else {
+      Serial.println("Failed to send data");
+      waiting_for_response = false;
+    }
+  } else {
+    // Broadcast mode - just log status
+    Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Data broadcasted" : "Broadcast failed");
+  }
+}
+
+void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len) {
+  const uint8_t *mac = info->src_addr;
+  float incomingrssi = info->rx_ctrl->rssi;
+  if(TWO_WAY_COMM && len == sizeof(response_message_t)) {
+    response_message_t response;
+    memcpy(&response, incomingData, sizeof(response));
+    
+    // Check if this response is for us
+    if(response.target_device_id == DEVICE_ID) {
+      Serial.printf("Received response for device %d\n", DEVICE_ID);
+      processResponseData(response.response_data);
+      waiting_for_response = false;
+      
+    }
+  }
+}
+
 
 float findLowestNonZero(float a, float b, float c) {
   // Initialize minimum to a very large value
@@ -638,31 +760,19 @@ float fetchBlynkValue(const char* vpin, const char* authToken) {
 
 void takeSamples(){
 
-     if (WiFi.status() == WL_CONNECTED) {
-          Blynk.syncVirtual(V41);
-          Blynk.syncVirtual(V62);
-          Blynk.syncVirtual(V78);
-          Blynk.syncVirtual(V79);
-          Blynk.syncVirtual(V82);
-
-          float min_value = findLowestNonZero(v41_value, v42_value, v62_value);
 
 
 
 
           //display.display(true);
 
-          if (min_value != 999) {
-              Blynk.virtualWrite(V118, min_value);
-              if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-              Blynk.virtualWrite(V118, min_value);
-              if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
+          if (outtemp != 0.0) {
             for (int i = 0; i < (maxArray - 1); i++) {
                 array3[i] = array3[i + 1];
             }
-            array3[(maxArray - 1)] = min_value;
+            array3[(maxArray - 1)] = outtemp;
           }
-        }
+        
 
         if (readingCount < maxArray) {
             readingCount++;
@@ -717,7 +827,7 @@ void updateMain() {
     display.setFont(FONT1); // Font size 2 (16px)
     display.setCursor(24, 2); // Adjusted to fit top-left quadrant
     display.print("Temp");
-    float temptodraw = array3[(maxArray - 1)];
+    float temptodraw = outtemp;
     if (temptodraw > -10) {display.setCursor(8, height1);}
     else {display.setCursor(2, height1);} // Centered vertically in quadrant
     display.setFont(FONT2); // Font size 3 (24px)
@@ -793,6 +903,37 @@ float readChannel(ADS1115_MUX channel) {
 
 void setup()
 {
+  setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+  tzset();
+  
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm); 
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(false);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  
+  // Register callbacks
+  esp_now_register_send_cb(OnDataSent);
+  if(TWO_WAY_COMM) {
+    esp_now_register_recv_cb(OnDataRecv);
+  }
+  
+  // Register broadcast peer
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
+  }
+  WiFi.setTxPower(WIFI_POWER_8_5dBm); 
+  Serial.println("ESP-NOW initialized successfully");
   Wire.begin();  
   adc.init();
   adc.setVoltageRange_mV(ADS1115_RANGE_4096); 
@@ -814,6 +955,13 @@ void setup()
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
     abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
+
+
+  sendSensorData();
+
+  while(waiting_for_response && millis() < response_timeout) {
+    delay(100); // Wait for response
+  }
 
 
 
@@ -842,13 +990,12 @@ void setup()
   firstrun++;
 
   display.setTextColor(GxEPD_BLACK, GxEPD_WHITE);
-  
 
 
 
   if (GPIO_reason < 0) {
-    startWifi();
-    if (buttonstart) {startWebserver(); return;}
+    //startWifi();
+    //if (buttonstart) {startWebserver(); return;}
     takeSamples();
       switch (page){
         case 0: 
@@ -895,7 +1042,7 @@ void setup()
             startWebserver();
           return;}
         }
-      startWifi();
+      //startWifi();
       takeSamples();
       display.clearScreen();
       switch (page){
