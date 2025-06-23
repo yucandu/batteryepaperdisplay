@@ -69,7 +69,7 @@ float abshum;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 bool buttonstart = false;
-unsigned long localUnixtime = 0;
+RTC_DATA_ATTR unsigned long localUnixtime = 0;
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
@@ -903,6 +903,10 @@ float readChannel(ADS1115_MUX channel) {
 
 void setup()
 {
+  struct timeval tv;
+  tv.tv_sec = localUnixtime;
+  tv.tv_usec = 0;
+  settimeofday(&tv, NULL);
   setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
   tzset();
   
