@@ -59,10 +59,11 @@ RTC_DATA_ATTR float array4[maxArray];
 RTC_DATA_ATTR float windspeed, windgust, fridgetemp, outtemp;
 
   float t, h, pres, barx;
-  float v41_value, v42_value, v62_value;
+  float v41_value, v42_value, v62_value, outhumidex, inhumidex, indewp;
 
  RTC_DATA_ATTR   int firstrun = 100;
  RTC_DATA_ATTR   int page = 2;
+ float dailyDrain = 0.0; // Daily battery drain in mAh
 float abshum;
  float minVal = 3.9;
  float maxVal = 4.2;
@@ -110,7 +111,7 @@ void collectSensorData(float* data) {
       data[2] = pres; // Pressure
       data[3] = vBat;   // Battery voltage
       data[4] = abshum;   // Absolute humidity
-      data[5] = 0.0;   // Unused
+      data[5] = dailyDrain;   // Unused
       data[6] = 0.0;   // Unused
 }
 
@@ -121,6 +122,7 @@ void processResponseData(float* data) {
       outtemp = data[2]; // Assuming third element is outdoor temperature
       windspeed = data[3]; // Assuming fourth element is wind speed
       windgust = data[4]; // Assuming fifth element is wind gust
+      outhumidex = data[5]; // Assuming sixth element is outdoor humidex
       struct timeval tv;
       tv.tv_sec = localUnixtime;
       tv.tv_usec = 0;
@@ -211,25 +213,6 @@ float findLowestNonZero(float a, float b, float c) {
   return minimum;
 }
 
-void drawCenteredText(const char* text, int x, int y, int w, int h) {
-    int16_t tbx, tby;
-    uint16_t tbw, tbh;
-    display.getTextBounds(text, x, y, &tbx, &tby, &tbw, &tbh);
-    int cx = x + (w - tbw) / 2 - tbx;
-    int cy = y + (h - tbh) / 2 - tby;
-    display.setCursor(cx, cy);
-    display.print(text);
-}
-
-// Helper: center a float value with units in a rectangle
-void drawCenteredValue(float value, int decimals, const char* units, int x, int y, int w, int h, bool showDegree = false) {
-    char buf[16];
-    dtostrf(value, 0, decimals, buf);
-    String s = String(buf);
-    if (showDegree) s += String(char(247));
-    if (units) s += units;
-    drawCenteredText(s.c_str(), x, y, w, h);
-}
 
 
 void gotosleep() {
@@ -264,6 +247,7 @@ BLYNK_CONNECTED() {
   Blynk.syncVirtual(V41);
   Blynk.syncVirtual(V42);
   Blynk.syncVirtual(V62);
+  Blynk.syncVirtual(V65);
   Blynk.syncVirtual(V78);
   Blynk.syncVirtual(V79);
   Blynk.syncVirtual(V82);
@@ -279,6 +263,9 @@ BLYNK_WRITE(V42) {
 }
 BLYNK_WRITE(V62) {
   v62_value = param.asFloat();
+}
+BLYNK_WRITE(V65) {
+  outhumidex = param.asFloat();
 }
 BLYNK_WRITE(V78) {
   windspeed = param.asFloat();
@@ -303,24 +290,20 @@ void initTime(String timezone){
 
 }
 
-float calculateBatteryDrainRate(int N) {
-    if (readingCount < N) N = readingCount;
-    if (N < 2) return 0;
-
-    // Each reading is 5 minutes apart
-    float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    int startIdx = maxArray - N;
-    for (int i = 0; i < N; i++) {
-        float x = i * 5.0 / 60.0; // hours since oldest reading
-        float y = array4[startIdx + i];
-        sumX += x;
-        sumY += y;
-        sumXY += x * y;
-        sumXX += x * x;
+float calculateADCStepRate(float vBatArray[], int counts) {
+    // Find highest and lowest voltage in the array
+    float highest = vBatArray[0];
+    float lowest = vBatArray[0];
+    
+    for (int i = 1; i < counts; i++) {
+        if (vBatArray[i] > highest) highest = vBatArray[i];
+        if (vBatArray[i] < lowest) lowest = vBatArray[i];
     }
-    float slope = (N * sumXY - sumX * sumY) / (N * sumXX - sumX * sumX); // V/hour
-    float drainPerDay = slope * 1000.0 * 24.0; // mV per day
-    return drainPerDay;
+    
+    float totalDrop = highest - lowest;
+    float totalDays = (counts - 1) * 5.0 / (60.0 * 24.0);
+    
+    return totalDrop / totalDays;
 }
 
 void startWifi(){
@@ -381,24 +364,11 @@ void startWifi(){
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
   Blynk.virtualWrite(V117, WiFi.RSSI());
   if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-            if (readingCount > 2) {
-              float dailyDrain;
-              if (readingCount > 12) {
-                dailyDrain = calculateBatteryDrainRate(12); // Use last 12 readings (1 hour)
-                Blynk.virtualWrite(V116, dailyDrain);
-                Blynk.run();
-              }
-              else
-              {
-                dailyDrain = calculateBatteryDrainRate(readingCount); // Use all readings
-                Blynk.virtualWrite(V116, dailyDrain);
-                Blynk.run();
-              }
-              Blynk.virtualWrite(V116, dailyDrain);
-              Blynk.run();
-              Blynk.virtualWrite(V116, dailyDrain);
-              Blynk.run();
-            }
+
+
+
+
+                //Blynk.virtualWrite(V116, dailyDrain);
 
     struct tm timeinfo;
     getLocalTime(&timeinfo);
@@ -796,6 +766,16 @@ void takeSamples(){
         array4[(maxArray - 1)] = vBat;
 }
 
+void drawCenteredText(const char* text, int x, int y, int w, int h) {
+    int16_t tbx, tby;
+    uint16_t tbw, tbh;
+    display.getTextBounds(text, x, y, &tbx, &tby, &tbw, &tbh);
+    int cx = x + (w - tbw) / 2 - tbx;
+    int cy = y + (h - tbh) / 2 - tby;
+    display.setCursor(cx, cy);
+    display.print(text);
+}
+
 void updateMain() {
     time_t now = time(NULL);
     struct tm timeinfo;
@@ -820,60 +800,56 @@ void updateMain() {
     display.drawLine(100, 0, 100, 200, GxEPD_BLACK); // Vertical center line (thicker)
     display.drawLine(0, 99, 200, 99, GxEPD_BLACK);  // Horizontal center line
     display.drawLine(0, 100, 200, 100, GxEPD_BLACK); // Horizontal center line (thicker)
-    int height1 = 60;
-    int width2 = 118;
-    int height2 = 160;
-    // Quadrant 1: Top-left
-    display.setFont(FONT1); // Font size 2 (16px)
-    display.setCursor(24, 2); // Adjusted to fit top-left quadrant
-    display.print("Temp");
-    float temptodraw = outtemp;
-    if (temptodraw > -10) {display.setCursor(8, height1);}
-    else {display.setCursor(2, height1);} // Centered vertically in quadrant
-    display.setFont(FONT2); // Font size 3 (24px)
-    
-    if ((temptodraw > 0) && (temptodraw < 10)) { display.print(" "); }
-    display.print(temptodraw, 1);
-    if (temptodraw > -10) {
-      display.setFont();
-      display.print(char(247));
-      display.print("c");
-    }
 
-    // Quadrant 2: Top-right
-    display.setFont(FONT1); // Font size 2 (16px)
-    display.setCursor(124, 2); // Adjusted to fit top-right quadrant
-    display.print("Wind");
-    display.setCursor(width2, height1); // Centered vertically in quadrant
-    display.setFont(FONT2); // Font size 3 (24px)
-    display.print(windspeed, 0);
-    display.setFont();
-    display.print("kph");
+    const int QUAD_WIDTH = 100;
+    const int QUAD_HEIGHT = 100;
+    indewp = t - ((100 - h)/5); //calculate dewpoint
+    inhumidex = t + 0.5555 * (6.11 * pow(2.71828, 5417.7530*( (1/273.16) - (1/(273.15 + indewp)) ) ) - 10);
+    auto centerTextInQuad = [&](int quadX, int quadY, const char* value, const char* unit, const char* title) {
+      // For the title at top
+      display.setFont(FONT1);
+      int16_t x1, y1;
+      uint16_t w, h;
+      display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+      int titleX = quadX + (QUAD_WIDTH - w) / 2;
+      display.setCursor(titleX, quadY + 15);
+      display.print(title);
 
-    // Quadrant 3: Bottom-left
-    display.setFont(FONT1); // Font size 2 (16px)
-    display.setCursor(24, 104); // Adjusted for bottom-left quadrant
-    display.print("Fridge");
-    display.setCursor(15, height2); // Centered vertically in quadrant
-    display.setFont(FONT2); // Font size 3 (24px)
-    display.print(fridgetemp, 1);
-    display.setFont();
-    display.print(char(247));
-    display.print("c");
+      // For the large value - get bounds first to center vertically
+      display.setFont(FONT2);
+      display.getTextBounds(value, 0, 0, &x1, &y1, &w, &h);
+      int valueX = quadX + (QUAD_WIDTH - w) / 2;
+      // Center value vertically in remaining space (after title)
+      int valueY = quadY + ((QUAD_HEIGHT + h) / 2);  // +10 for visual adjustment
+      display.setCursor(valueX, valueY);
+      display.print(value);
 
-    // Quadrant 4: Bottom-right
-    display.setFont(FONT1); // Font size 2 (16px)
-    display.setCursor(124, 104); // Adjusted for bottom-right quadrant
-    display.print("Gust");
-    display.setCursor(width2, height2); // Centered vertically in quadrant
-    display.setFont(FONT2); // Font size 3 (24px)
-    display.print(windgust, 0);
-    display.setFont();
-    display.print("kph");
+      // For the small unit - position below centered value
+      display.setFont(FONT1);
+      display.getTextBounds(unit, 0, 0, &x1, &y1, &w, &h);
+      int unitX = quadX + (QUAD_WIDTH - w) / 2;
+      int unitY = valueY + 20;  // Fixed distance below value
+      display.setCursor(unitX, unitY);
+      display.print(unit);
+    };
+    char tempStr[10], humStr[10], presStr[10], dewStr[10];
+    snprintf(tempStr, sizeof(tempStr), "%.1f", outtemp);
+    snprintf(humStr, sizeof(humStr), "%.1f", outhumidex);
+    snprintf(presStr, sizeof(presStr), "%.0f", fridgetemp);
+    snprintf(dewStr, sizeof(dewStr), "%.1f", inhumidex);
+
+    // Draw each quadrant with title, value and unit
+    centerTextInQuad(0, 0, tempStr, "°C", "Temp");
+    centerTextInQuad(100, 0, humStr, "", "Out Humidex");
+    centerTextInQuad(0, 100, presStr, "°C", "Fridge");
+    centerTextInQuad(100, 100, dewStr, "", "In Humidex");
+   
+
 
     // Display time string near the bottom-left corner
     display.setFont(); // Font size 1 (8px)
-    display.setCursor(0, 192); // 8px above the bottom
+    display.setTextSize(2); // Font size 1 (8px)
+    display.setCursor(0, 184); // 8px above the bottom
     display.print(timeString);
 
     // Battery status (bottom-right)
@@ -959,7 +935,7 @@ void setup()
    h = humidity.relative_humidity;
    pres = bmp.readPressure() / 100.0;
     abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
-
+                dailyDrain = calculateADCStepRate(array4, readingCount);
 
   sendSensorData();
 
