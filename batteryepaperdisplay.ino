@@ -56,7 +56,7 @@ RTC_DATA_ATTR float array1[maxArray];
 RTC_DATA_ATTR float array2[maxArray];
 RTC_DATA_ATTR float array3[maxArray];
 RTC_DATA_ATTR float array4[maxArray];
-RTC_DATA_ATTR float windspeed, windgust, fridgetemp, outtemp;
+ float windspeed, windgust, fridgetemp, outtemp;
 
   float t, h, pres, barx;
   float v41_value, v42_value, v62_value, outhumidex, inhumidex, indewp;
@@ -70,7 +70,7 @@ float abshum;
 RTC_DATA_ATTR int readingCount = 0; // Counter for the number of readings
 int readingTime;
 bool buttonstart = false;
-RTC_DATA_ATTR unsigned long localUnixtime = 0;
+ unsigned long localUnixtime = 0;
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)
 
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=5*/ SS, /*DC=*/ 21, /*RES=*/ 20, /*BUSY=*/ 10)); // GDEH0154D67 200x200, SSD1681
@@ -290,20 +290,41 @@ void initTime(String timezone){
 
 }
 
-float calculateADCStepRate(float vBatArray[], int counts) {
-    // Find highest and lowest voltage in the array
-    float highest = vBatArray[0];
-    float lowest = vBatArray[0];
+double calculateADCStepRate(float vBatArray[], int counts) {
+    // Find unique voltage levels and when they first occur
+    float firstVoltage = vBatArray[0];
+    float lastVoltage = vBatArray[counts - 1];
     
-    for (int i = 1; i < counts; i++) {
-        if (vBatArray[i] > highest) highest = vBatArray[i];
-        if (vBatArray[i] < lowest) lowest = vBatArray[i];
+    // Find the last occurrence of the first voltage
+    int lastOccurrenceOfFirst = 0;
+    for (int i = 0; i < counts; i++) {
+        if (vBatArray[i] == firstVoltage) {
+            lastOccurrenceOfFirst = i;
+        }
     }
     
-    float totalDrop = highest - lowest;
-    float totalDays = (counts - 1) * 5.0 / (60.0 * 24.0);
+    // Find the first occurrence of the last voltage
+    int firstOccurrenceOfLast = counts - 1;
+    for (int i = 0; i < counts; i++) {
+        if (vBatArray[i] == lastVoltage) {
+            firstOccurrenceOfLast = i;
+            break;
+        }
+    }
     
-    return totalDrop / totalDays;
+    // Calculate the actual time span of the transition
+    float timeSpanMinutes = (firstOccurrenceOfLast - lastOccurrenceOfFirst) * 5.0;
+    float timeSpanDays = timeSpanMinutes / (60.0 * 24.0);
+    
+    // Calculate voltage change
+    float voltageChange = lastVoltage - firstVoltage;
+    
+    // Avoid division by zero
+    if (timeSpanDays == 0) {
+        return 0.0;
+    }
+    
+    return voltageChange / timeSpanDays;
 }
 
 void startWifi(){
@@ -835,13 +856,13 @@ void updateMain() {
     char tempStr[10], humStr[10], presStr[10], dewStr[10];
     snprintf(tempStr, sizeof(tempStr), "%.1f", outtemp);
     snprintf(humStr, sizeof(humStr), "%.1f", outhumidex);
-    snprintf(presStr, sizeof(presStr), "%.0f", fridgetemp);
+    snprintf(presStr, sizeof(presStr), "%.1f", fridgetemp);
     snprintf(dewStr, sizeof(dewStr), "%.1f", inhumidex);
 
     // Draw each quadrant with title, value and unit
-    centerTextInQuad(0, 0, tempStr, "°C", "Temp");
+    centerTextInQuad(0, 0, tempStr, "C", "Temp");
     centerTextInQuad(100, 0, humStr, "", "Out Humidex");
-    centerTextInQuad(0, 100, presStr, "°C", "Fridge");
+    centerTextInQuad(0, 100, presStr, "C", "Fridge");
     centerTextInQuad(100, 100, dewStr, "", "In Humidex");
    
 
@@ -936,6 +957,7 @@ void setup()
    pres = bmp.readPressure() / 100.0;
     abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature);
                 dailyDrain = calculateADCStepRate(array4, readingCount);
+                dailyDrain = dailyDrain * 1000; // Convert to mV
 
   sendSensorData();
 
